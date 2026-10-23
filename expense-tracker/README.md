@@ -165,9 +165,26 @@ totals retain two decimal places, including zero and negative balances.
 The Bootstrap cards stack on small screens. No new dependencies, schema
 migrations, environment variables or cache resets are required.
 
+## Global exception handling
+
+`common.exception.GlobalExceptionHandler` handles `IllegalArgumentException`
+and Spring Security's `AccessDeniedException` raised during MVC request handling.
+They render `templates/error/error.html` with HTTP 400 and 403 respectively.
+The model uses the shared `ErrorResponse` structure (`code`, `message`, `timestamp`);
+the Bootstrap page displays only a fixed friendly message and navigation links.
+Raw exception messages and stack traces are not added to the page model.
+
+Existing registration validation and feature-specific JSON error handlers have
+explicit priority over the global advice, including matches on nested causes.
+Security filter failures, such as missing CSRF tokens, continue through
+Spring Security's existing handlers; anonymous protected requests still redirect
+to login. The advice does not convert unexpected server failures to client errors.
+No database migrations, dependencies, environment variables or server cache resets
+are required. Refresh open pages to load the new error template when an error occurs.
+
 ## Interface
 
-All nine Thymeleaf pages use Bootstrap 5.3.8 CSS through jsDelivr, pinned with
+All ten Thymeleaf pages use Bootstrap 5.3.8 CSS through jsDelivr, pinned with
 the integrity hash from the [official Bootstrap documentation](https://getbootstrap.com/docs/5.3/getting-started/introduction/).
 Login and registration use centered responsive cards. Forms, buttons, validation
 feedback, bordered tables and pagination use Bootstrap classes. The old local

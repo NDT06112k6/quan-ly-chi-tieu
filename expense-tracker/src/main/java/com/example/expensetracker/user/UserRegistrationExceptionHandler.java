@@ -2,6 +2,8 @@ package com.example.expensetracker.user;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
@@ -10,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.ModelAndView;
 
 @ControllerAdvice(assignableTypes = UserController.class)
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class UserRegistrationExceptionHandler {
 
     private static final String EMAIL_CONSTRAINT = "uk_users_email";

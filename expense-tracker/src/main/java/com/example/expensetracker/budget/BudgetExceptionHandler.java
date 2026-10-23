@@ -3,6 +3,8 @@ package com.example.expensetracker.budget;
 import com.example.expensetracker.common.error.ErrorResponse;
 import com.example.expensetracker.common.util.ErrorResponseUtil;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -11,6 +13,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @ControllerAdvice(assignableTypes = BudgetController.class)
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class BudgetExceptionHandler {
 
     private static final String INVALID_CATEGORY_CODE = "INVALID_BUDGET_CATEGORY";
