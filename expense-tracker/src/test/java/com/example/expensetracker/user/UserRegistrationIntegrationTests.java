@@ -8,8 +8,10 @@ import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -83,9 +85,12 @@ class UserRegistrationIntegrationTests {
         assertThat(user.getPasswordHash()).isNotEqualTo(PASSWORD);
         assertThat(passwordEncoder.matches(PASSWORD, user.getPasswordHash())).isTrue();
 
-        mockMvc.perform(formLogin("/login").user(email).password(PASSWORD))
+        MvcResult loginResult = mockMvc.perform(formLogin("/login").user(email).password(PASSWORD))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(authenticated().withUsername(email).withRoles("USER"));
+                .andExpect(redirectedUrl("/"))
+                .andExpect(authenticated().withUsername(email).withRoles("USER"))
+                .andReturn();
+        verifyHomePageAndLogout(loginResult);
     }
 
     @Test
@@ -223,6 +228,23 @@ class UserRegistrationIntegrationTests {
         dto.setConfirmPassword(PASSWORD);
         dto.setDisplayName("Registration Test");
         return dto;
+    }
+
+    private void verifyHomePageAndLogout(MvcResult loginResult) throws Exception {
+        MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+        assertThat(session).isNotNull();
+
+        mockMvc.perform(get("/").session(session))
+                .andExpect(status().isOk())
+                .andExpect(view().name("index"))
+                .andExpect(content().string(containsString("Chào mừng đến với Expense Tracker")));
+        mockMvc.perform(post("/logout").session(session).with(csrf()))
+                .andExpect(redirectedUrl("/login?logout"))
+                .andExpect(unauthenticated());
+
+        assertThat(session.isInvalid()).isTrue();
+        mockMvc.perform(get("/"))
+                .andExpect(redirectedUrl("/login"));
     }
 
     private MockHttpServletRequestBuilder registrationRequest(UserRegisterDTO dto) {

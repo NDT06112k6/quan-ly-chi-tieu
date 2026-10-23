@@ -48,6 +48,12 @@ authority, and rejects disabled accounts. Submit logout to `POST /logout`
 with a CSRF token; successful logout invalidates the session and redirects
 to `/login?logout`.
 
+Authenticated users can open `GET /`, rendered by `HomeController` and
+`templates/index.html`. The home page displays the welcome message and a
+logout form with a CSRF token. After login, Spring Security returns to a saved
+request when present, or to `/` otherwise. Anonymous visitors to `/` are
+redirected to `/login`.
+
 As explicitly requested for this configuration, the `PasswordEncoder` bean
 uses `BCryptPasswordEncoder` directly, overriding the general
 `DelegatingPasswordEncoder` rule in `AGENTS.md`. Store password hashes produced
