@@ -28,6 +28,34 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     boolean existsByIdAndUserId(Long id, Long userId);
 
+    @Query("""
+            SELECT COALESCE(SUM(transaction.amount), 0)
+            FROM Transaction transaction
+            JOIN Category category ON category.id = transaction.categoryId
+                AND category.userId = transaction.userId
+            WHERE transaction.userId = :userId
+                AND category.userId = :userId
+                AND category.type = com.example.expensetracker.category.CategoryType.THU
+                AND MONTH(transaction.occurredOn) = :month
+                AND YEAR(transaction.occurredOn) = :year
+            """)
+    BigDecimal sumIncomeByUserIdAndMonth(
+            @Param("userId") Long userId, @Param("month") int month, @Param("year") int year);
+
+    @Query("""
+            SELECT COALESCE(SUM(transaction.amount), 0)
+            FROM Transaction transaction
+            JOIN Category category ON category.id = transaction.categoryId
+                AND category.userId = transaction.userId
+            WHERE transaction.userId = :userId
+                AND category.userId = :userId
+                AND category.type = com.example.expensetracker.category.CategoryType.CHI
+                AND MONTH(transaction.occurredOn) = :month
+                AND YEAR(transaction.occurredOn) = :year
+            """)
+    BigDecimal sumExpenseByUserIdAndMonth(
+            @Param("userId") Long userId, @Param("month") int month, @Param("year") int year);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
     @Query("""

@@ -49,7 +49,7 @@ with a CSRF token; successful logout invalidates the session and redirects
 to `/login?logout`.
 
 Authenticated users can open `GET /`, rendered by `HomeController` and
-`templates/index.html`. The home page displays the welcome message and a
+`templates/index.html`. The home page displays the monthly dashboard and a
 logout form with a CSRF token. After login, Spring Security returns to a saved
 request when present, or to `/` otherwise. Anonymous visitors to `/` are
 redirected to `/login`.
@@ -116,6 +116,23 @@ form values. Loading failures are visible and can be retried. The list resolves
 category names in one user-scoped, bounded query for the current transaction
 page. No new dependencies, schema changes, environment variables or cache
 resets are required.
+
+## Dashboard
+
+`GET /` displays total income, total expense and balance for the authenticated
+user's current calendar month, plus a link to create a transaction. The month
+and year come from `LocalDate.now()` in the application's JVM timezone. Request
+parameters cannot override the report period or owner. The model contains only
+`DashboardDTO` monetary values, the month and the year.
+
+The repository aggregates `THU` and `CHI` separately by transaction date,
+filtering both transactions and joined categories by the same user ID. A month
+with no matching transactions totals zero through SQL `COALESCE`; database
+failures are not converted to zeros. The service uses a read-only transaction
+for the two sums and `BigDecimal` subtraction for the balance. All displayed
+totals retain two decimal places, including zero and negative balances.
+The Bootstrap cards stack on small screens. No new dependencies, schema
+migrations, environment variables or cache resets are required.
 
 ## Interface
 

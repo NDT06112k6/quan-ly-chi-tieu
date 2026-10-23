@@ -2,6 +2,7 @@ package com.example.expensetracker.transaction;
 
 import com.example.expensetracker.category.Category;
 import com.example.expensetracker.category.CategoryRepository;
+import com.example.expensetracker.home.DashboardDTO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -14,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.math.BigDecimal;
+
 @Service
 @Validated
 @Transactional(readOnly = true)
@@ -23,6 +26,7 @@ public class TransactionService {
     public static final int MAX_PAGE_SIZE = 100;
     private static final String DATE_SORT_PROPERTY = "occurredOn";
     private static final String ID_SORT_PROPERTY = "id";
+    private static final int MONEY_SCALE = 2;
 
     private final TransactionRepository transactionRepository;
     private final CategoryRepository categoryRepository;
@@ -50,6 +54,18 @@ public class TransactionService {
         Page<Transaction> transactions = transactionRepository.findByUserId(userId, sortedPageRequest);
         Page<TransactionDTO> transactionDTOs = transactions.map(this::mapToDTO);
         return transactionDTOs;
+    }
+
+    public DashboardDTO getDashboardData(@NotNull @Positive Long userId,
+            @Min(1) @Max(12) int month, @Min(1) @Max(9999) int year) {
+        BigDecimal totalIncome = transactionRepository.sumIncomeByUserIdAndMonth(userId, month, year);
+        BigDecimal totalExpense = transactionRepository.sumExpenseByUserIdAndMonth(userId, month, year);
+        totalIncome = totalIncome.setScale(MONEY_SCALE);
+        totalExpense = totalExpense.setScale(MONEY_SCALE);
+        BigDecimal balance = totalIncome.subtract(totalExpense);
+
+        DashboardDTO dashboard = new DashboardDTO(totalIncome, totalExpense, balance);
+        return dashboard;
     }
 
     private TransactionDTO mapToDTO(Transaction transaction) {
