@@ -22,6 +22,41 @@ for user-owned data. Use inherited `save`/`saveAndFlush` only for new entities
 whose ownership was assigned by the service. The repository interfaces alone do not derive the current
 user from Spring Security.
 
+## Authentication
+
+`SecurityConfig` permits anonymous access to `/login`, `/register`, `/css/**`
+and `/js/**`. All other application requests require authentication. CSRF
+protection remains enabled, including for login, registration and logout forms.
+`GET /login` and `GET /register` render the Thymeleaf pages in
+`templates/user/`. Registration submits to `POST /register` and redirects to
+`/login?success` after the account is saved. The form validates email (up to
+255 characters), display name (up to 100 characters), and matching passwords
+(8–72 characters and at most 72 UTF-8 bytes, as required by BCrypt). New
+accounts receive role `USER` and are enabled. Roles and account status are
+never bound from the registration form.
+
+Validation and business errors are rendered with `th:errors`. The registration
+advice also handles concurrent duplicate email inserts using the existing
+`uk_users_email` constraint; unrelated database failures remain errors.
+Password fields are never repopulated after a failure. Thymeleaf adds the CSRF
+token to both forms. No database migration or cache reset is needed.
+
+Submit login forms to `POST /login` with the email in the `username` field,
+the password in the `password` field, and a CSRF token. Authentication loads
+the account from `UserRepository.findByEmail`, uses its role as a `ROLE_`
+authority, and rejects disabled accounts. Submit logout to `POST /logout`
+with a CSRF token; successful logout invalidates the session and redirects
+to `/login?logout`.
+
+As explicitly requested for this configuration, the `PasswordEncoder` bean
+uses `BCryptPasswordEncoder` directly, overriding the general
+`DelegatingPasswordEncoder` rule in `AGENTS.md`. Store password hashes produced
+by this bean in `users.password_hash`. Direct BCrypt expects hashes such as
+`$2a$...` without the `{bcrypt}` prefix used by `DelegatingPasswordEncoder`.
+Existing prefixed hashes require an explicit migration or password reset before
+they can authenticate with this encoder. No existing hashes are changed here.
+There are no new environment variables or cache settings for this change.
+
 ## Verification
 
 Run `./mvnw verify` (`.\mvnw.cmd verify` on Windows). The repository integration

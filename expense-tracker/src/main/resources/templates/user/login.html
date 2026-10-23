@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Đăng nhập | Expense Tracker</title>
+    <link rel="stylesheet" th:href="@{/css/auth.css}">
+</head>
+<body>
+<main class="auth-card">
+    <p class="brand">Expense Tracker</p>
+    <h1>Đăng nhập</h1>
+    <p class="intro">Chào mừng bạn trở lại.</p>
+    <p class="notice" role="status" th:if="${param.success != null}">
+        Đăng ký thành công. Bạn có thể đăng nhập ngay.
+    </p>
+    <p class="notice" role="status" th:if="${param.logout != null}">
+        Bạn đã đăng xuất thành công.
+    </p>
+
+    <form method="post" th:action="@{/login}" th:object="${userLoginDTO}">
+        <p class="error" role="alert" th:if="${#fields.hasGlobalErrors()}" th:errors="*{global}"></p>
+        <div class="field">
+            <label for="username">Email</label>
+            <input type="email" id="username" th:field="*{username}"
+                   autocomplete="username" maxlength="255" required>
+        </div>
+        <div class="field">
+            <label for="password">Mật khẩu</label>
+            <input type="password" id="password" name="password" autocomplete="current-password" required>
+        </div>
+        <button type="submit">Đăng nhập</button>
+    </form>
+    <p class="switch-form">Chưa có tài khoản? <a th:href="@{/register}">Đăng ký</a></p>
+</main>
+</body>
+</html>
