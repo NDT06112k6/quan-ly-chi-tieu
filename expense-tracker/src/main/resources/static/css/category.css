@@ -1,0 +1,76 @@
+.category-card {
+    max-width: 760px;
+}
+
+.category-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 24px 0;
+}
+
+.action-link {
+    display: inline-block;
+    padding: 11px 16px;
+    border: 1px solid #047857;
+    border-radius: 8px;
+    background: #047857;
+    color: #fff;
+    font-weight: 600;
+    text-decoration: none;
+    text-align: center;
+}
+
+.action-link:hover {
+    background: #065f46;
+}
+
+.action-link.secondary {
+    background: #fff;
+    color: #047857;
+}
+
+.action-link.secondary:hover {
+    background: #ecfdf5;
+}
+
+select {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid #94a3b8;
+    border-radius: 8px;
+    background: #fff;
+    color: inherit;
+    font: inherit;
+}
+
+select:focus-visible {
+    outline: 3px solid #0d9488;
+    outline-offset: 3px;
+}
+
+form {
+    margin-top: 24px;
+}
+
+.table-container {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    text-align: left;
+    padding: 12px;
+    border-bottom: 1px solid #e2e8f0;
+    overflow-wrap: anywhere;
+}
+
+th {
+    background: #f8fafc;
+}

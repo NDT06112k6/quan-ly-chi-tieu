@@ -63,6 +63,28 @@ Existing prefixed hashes require an explicit migration or password reset before
 they can authenticate with this encoder. No existing hashes are changed here.
 There are no new environment variables or cache settings for this change.
 
+## Categories
+
+Authenticated users can list their categories at `GET /categories`, open the
+creation form at `GET /categories/new`, and submit it to `POST /categories`.
+The listing shows name and type, with buttons to add a category or return home.
+Successful creation redirects to `/categories`; validation errors render the
+form with `th:errors`. Names are required and limited to 100 characters; type
+is required and must be `CHI` or `THU`. Creation always inserts a new category.
+
+`CurrentUserService` resolves the authenticated email to an enabled account's
+ID. The controller never accepts ownership from request parameters, and form
+binding accepts only `name` and `type`. Missing or disabled accounts are denied.
+All category reads include `user_id` and controllers expose only DTOs.
+
+The requested `findByUserId(Long)` repository method and
+`getAllCategoriesByUserId(Long)` service method return lists. The web listing
+uses their paginated overloads with `Pageable`: `page` is zero-based, `size`
+defaults to 20 and is capped at 100, and results always sort by ascending ID.
+The legacy `findAllByUserId` remains available for existing callers. Use the
+paginated overloads for web lists. No schema, dependencies, environment
+variables or cache settings change.
+
 ## Verification
 
 Run `./mvnw verify` (`.\mvnw.cmd verify` on Windows). The repository integration

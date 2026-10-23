@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Danh mục | Expense Tracker</title>
+    <link rel="stylesheet" th:href="@{/css/auth.css}">
+    <link rel="stylesheet" th:href="@{/css/category.css}">
+</head>
+<body>
+<main class="auth-card category-card">
+    <h1>Danh mục của tôi</h1>
+    <nav class="category-actions" aria-label="Điều hướng danh mục">
+        <a class="action-link" th:href="@{/categories/new}">Thêm danh mục</a>
+        <a class="action-link secondary" th:href="@{/}">Quay lại trang chủ</a>
+    </nav>
+    <p th:if="${categories.totalElements == 0}">Bạn chưa có danh mục nào.</p>
+    <div class="table-container" th:if="${!categories.empty}">
+        <table>
+            <thead>
+            <tr>
+                <th scope="col">Tên</th>
+                <th scope="col">Loại</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="category : ${categories.content}">
+                <td th:text="${category.name}"></td>
+                <td th:text="${category.type == 'CHI' ? 'Chi tiêu (CHI)' : 'Thu nhập (THU)'}"></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+    <nav class="category-actions" aria-label="Phân trang" th:if="${categories.totalPages > 1}">
+        <a th:if="${categories.hasPrevious()}"
+           th:href="@{/categories(page=${categories.number - 1},size=${categories.size})}">Trang trước</a>
+        <span th:text="|Trang ${categories.number + 1} / ${categories.totalPages}|"></span>
+        <a th:if="${categories.hasNext()}"
+           th:href="@{/categories(page=${categories.number + 1},size=${categories.size})}">Trang sau</a>
+    </nav>
+</main>
+</body>
+</html>
