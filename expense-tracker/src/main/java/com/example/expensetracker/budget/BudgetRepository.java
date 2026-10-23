@@ -1,5 +1,8 @@
 package com.example.expensetracker.budget;
 
+import com.example.expensetracker.common.util.MonthUtil;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -18,11 +21,32 @@ import java.util.Optional;
  */
 public interface BudgetRepository extends JpaRepository<Budget, Long> {
 
+    Page<Budget> findByUserId(Long userId, Pageable pageable);
+
+    Optional<Budget> findByUserIdAndCategoryIdAndMonth(Long userId, Long categoryId, LocalDate month);
+
+    default Optional<Budget> findByUserIdAndCategoryIdAndMonth(Long userId, Long categoryId, String month) {
+        LocalDate monthStart = MonthUtil.firstDayOfMonth(month);
+        Optional<Budget> budget = findByUserIdAndCategoryIdAndMonth(userId, categoryId, monthStart);
+        return budget;
+    }
+
     List<Budget> findAllByUserId(Long userId);
 
     Optional<Budget> findByIdAndUserId(Long id, Long userId);
 
     boolean existsByIdAndUserId(Long id, Long userId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query("""
+            UPDATE Budget entity
+            SET entity.limitAmount = :limitAmount
+            WHERE entity.id = :id
+                AND entity.userId = :userId
+            """)
+    int updateLimitAmountByIdAndUserId(
+            @Param("id") Long id, @Param("userId") Long userId, @Param("limitAmount") BigDecimal limitAmount);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional

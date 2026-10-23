@@ -117,6 +117,37 @@ category names in one user-scoped, bounded query for the current transaction
 page. No new dependencies, schema changes, environment variables or cache
 resets are required.
 
+## Budgets
+
+Authenticated users can open `GET /budgets`, create or update a budget through
+`GET /budgets/new` and `POST /budgets`, and navigate there from the dashboard.
+Choose the same category and month to update its existing limit; a different
+month creates a new budget. Submitted IDs and ownership fields are ignored.
+The category must belong to the authenticated user; missing or foreign categories
+return HTTP 403 through centralized error handling with `code`, `message` and
+`timestamp`. Failed updates return HTTP 409 rather than reporting success.
+
+`BudgetDTO.month` and the repository's String overload accept `yyyy-MM` from
+1000-01 through 9999-12. They map to the first day of that month in the existing
+MySQL DATE column. Limits use positive `BigDecimal` values with at most 13 integer
+digits and 2 decimal digits. Invalid forms retain owned category options and
+display `th:errors`. CSRF protection applies to submission.
+
+The list and `getBudgetsByUserId` return DTO pages, defaulting to 20 rows and
+capping size at 100, ordered by month descending then ID descending. All reads
+and updates include the owner ID. The category dropdown initially loads 100
+options and can load more through `GET /budgets/categories?page=1`. Transactions
+and budgets share the scoped category view helper and `/js/category-options.js`.
+Refresh open forms to load the updated script path; no server cache reset is needed.
+
+Flyway migration `V2__unique_budget_per_category_month.sql` adds a unique key on
+`(user_id, category_id, month)`. Existing duplicate keys cause migration to fail
+without deleting or merging data; resolve those records explicitly before retrying.
+Budget writes lock the owned category within their transaction to serialize
+concurrent creation and updates. The database unique key also enforces the rule.
+No Maven dependencies or environment variables are added; Hibernate stays in
+`validate` mode.
+
 ## Dashboard
 
 `GET /` displays total income, total expense and balance for the authenticated
@@ -136,13 +167,13 @@ migrations, environment variables or cache resets are required.
 
 ## Interface
 
-All seven Thymeleaf pages use Bootstrap 5.3.8 CSS through jsDelivr, pinned with
+All nine Thymeleaf pages use Bootstrap 5.3.8 CSS through jsDelivr, pinned with
 the integrity hash from the [official Bootstrap documentation](https://getbootstrap.com/docs/5.3/getting-started/introduction/).
 Login and registration use centered responsive cards. Forms, buttons, validation
 feedback, bordered tables and pagination use Bootstrap classes. The old local
 `auth.css` and `category.css` stylesheets have been removed; browsers need access
 to the CDN to load the styles. Refresh open pages to load the updated templates.
-There are no Maven dependency, database, environment or server cache changes.
+The interface adds no Maven dependencies, environment variables or server cache settings.
 
 Transaction amounts remain positive `BigDecimal` values. The list colors them
 red for `CHI` and green for `THU` using the actual category type from the same

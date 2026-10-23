@@ -1,6 +1,4 @@
-package com.example.expensetracker.transaction;
-
-import com.example.expensetracker.category.CategoryDTO;
+package com.example.expensetracker.category;
 
 import java.util.List;
 

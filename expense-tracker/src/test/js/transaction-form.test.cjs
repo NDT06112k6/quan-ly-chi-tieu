@@ -4,7 +4,7 @@ const { resolve } = require("node:path");
 const { test } = require("node:test");
 const { runInNewContext } = require("node:vm");
 
-const source = readFileSync(resolve(__dirname, "../../main/resources/static/js/transaction-form.js"), "utf8");
+const source = readFileSync(resolve(__dirname, "../../main/resources/static/js/category-options.js"), "utf8");
 
 function createForm(responses) {
     const select = {
