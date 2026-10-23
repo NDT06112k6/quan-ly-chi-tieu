@@ -85,6 +85,54 @@ The legacy `findAllByUserId` remains available for existing callers. Use the
 paginated overloads for web lists. No schema, dependencies, environment
 variables or cache settings change.
 
+## Transactions
+
+Authenticated users can list transactions at `GET /transactions?page=0`, open
+`GET /transactions/new`, and submit `POST /transactions`. Creation redirects
+to `/transactions`. The list contains DTOs, shows category names, and has 20
+rows per page, ordered by date descending and then ID descending. The service
+also accepts a page size from 1 to 100. Invalid pagination returns HTTP 400.
+The table columns are date, category, amount and note; previous/next buttons
+follow the Spring Data `Page` state. The creation form posts to `/transactions`
+with number/date inputs, a category dropdown and a note field.
+
+The owner ID comes from `CurrentUserService`, never from form fields. Before
+inserting, the service resolves the category with `findByIdAndUserId` and
+rejects missing or foreign categories with HTTP 403. Those errors and invalid
+pagination use the shared JSON error shape `code`, `message`, `timestamp` via
+`TransactionExceptionHandler`. Other database failures remain failures.
+
+Amounts use `BigDecimal`, must be positive, and accept up to 13 integer digits
+and 2 decimal digits to match `DECIMAL(15,2)` without silent rounding. The date
+and category are required; notes are optional and limited to 1000 characters.
+Form validation errors render with `th:errors`, retaining the user's category
+options. Submission includes a CSRF token and never binds transaction ID or
+ownership from the request.
+
+The dropdown initially loads at most 100 categories belonging to the user.
+Its "Tải thêm danh mục" button calls the paginated DTO endpoint
+`GET /transactions/categories?page=1` to append more options without losing
+form values. Loading failures are visible and can be retried. The list resolves
+category names in one user-scoped, bounded query for the current transaction
+page. No new dependencies, schema changes, environment variables or cache
+resets are required.
+
+## Interface
+
+All seven Thymeleaf pages use Bootstrap 5.3.8 CSS through jsDelivr, pinned with
+the integrity hash from the [official Bootstrap documentation](https://getbootstrap.com/docs/5.3/getting-started/introduction/).
+Login and registration use centered responsive cards. Forms, buttons, validation
+feedback, bordered tables and pagination use Bootstrap classes. The old local
+`auth.css` and `category.css` stylesheets have been removed; browsers need access
+to the CDN to load the styles. Refresh open pages to load the updated templates.
+There are no Maven dependency, database, environment or server cache changes.
+
+Transaction amounts remain positive `BigDecimal` values. The list colors them
+red for `CHI` and green for `THU` using the actual category type from the same
+user-scoped category query that resolves category names. Color is never inferred
+from the amount's sign. Validation, CSRF, ownership checks and pagination remain
+active.
+
 ## Verification
 
 Run `./mvnw verify` (`.\mvnw.cmd verify` on Windows). The repository integration
@@ -94,3 +142,7 @@ users, exact monetary values, scoped deletions and category ownership constraint
 They require an available MySQL server and the `expense_tracker` database.
 Use a separate test database by setting `SPRING_DATASOURCE_URL`,
 `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD` when running tests.
+
+The transaction dropdown's JavaScript tests use Node's built-in test runner,
+without npm dependencies. With Node 24, run
+`node --test --test-isolation=none src/test/js/transaction-form.test.cjs`.

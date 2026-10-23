@@ -216,9 +216,11 @@ class UserRegistrationIntegrationTests {
     }
 
     @Test
-    void servesSharedFormStylesWithoutAuthentication() throws Exception {
-        mockMvc.perform(get("/css/auth.css"))
-                .andExpect(status().isOk());
+    void rendersBootstrapStylesheetWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/login"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css")));
     }
 
     private UserRegisterDTO validRegistration() {

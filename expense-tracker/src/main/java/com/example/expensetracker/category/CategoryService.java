@@ -3,6 +3,7 @@ package com.example.expensetracker.category;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +14,8 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 @Validated
@@ -62,5 +65,27 @@ public class CategoryService {
         dto.setName(category.getName());
         dto.setType(category.getType().name());
         return dto;
+    }
+
+    public Optional<CategoryDTO> getCategoryByIdAndUserId(Long categoryId, Long userId) {
+        Optional<CategoryDTO> category = categoryRepository.findByIdAndUserId(categoryId, userId)
+                .map(this::mapToDTO);
+        return category;
+    }
+
+    public List<CategoryDTO> getCategoriesByIdsForUser(@NotNull @Positive Long userId,
+            @NotNull @Size(max = MAX_PAGE_SIZE) Set<Long> categoryIds) {
+        List<CategoryDTO> categories = new ArrayList<>();
+        if (categoryIds.isEmpty()) {
+            return categories;
+        }
+
+        Pageable pageable = PageRequest.of(0, MAX_PAGE_SIZE);
+        Page<Category> categoryPage = categoryRepository.findByUserIdAndIdIn(userId, categoryIds, pageable);
+        for (Category category : categoryPage) {
+            CategoryDTO dto = mapToDTO(category);
+            categories.add(dto);
+        }
+        return categories;
     }
 }

@@ -168,7 +168,7 @@ class CategoryIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(view().name("category/form"))
                 .andExpect(model().attributeHasFieldErrors(CategoryDTO.MODEL_ATTRIBUTE, invalidField))
-                .andExpect(content().string(containsString("class=\"error\"")));
+                .andExpect(content().string(containsString("id=\"" + invalidField + "-error\"")));
 
         assertThat(categoryRepository.findByUserId(owner.getId())).isEmpty();
     }

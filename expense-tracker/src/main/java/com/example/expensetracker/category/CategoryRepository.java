@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Use methods with userId for user-owned data, including lookups before updates.
@@ -21,6 +22,8 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     List<Category> findByUserId(Long userId);
 
     Page<Category> findByUserId(Long userId, Pageable pageable);
+
+    Page<Category> findByUserIdAndIdIn(Long userId, Set<Long> categoryIds, Pageable pageable);
 
     List<Category> findAllByUserId(Long userId);
 

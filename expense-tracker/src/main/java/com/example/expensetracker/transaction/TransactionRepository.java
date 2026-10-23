@@ -1,5 +1,7 @@
 package com.example.expensetracker.transaction;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -17,6 +19,8 @@ import java.util.Optional;
  * Inherited methods such as findAll, findById and deleteById are not user-scoped.
  */
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
+
+    Page<Transaction> findByUserId(Long userId, Pageable pageable);
 
     List<Transaction> findAllByUserId(Long userId);
 

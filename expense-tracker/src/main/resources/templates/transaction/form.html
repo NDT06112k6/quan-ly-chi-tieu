@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Thêm giao dịch | Expense Tracker</title>
+    <script defer th:src="@{/js/transaction-form.js}"></script>
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+          crossorigin="anonymous">
+</head>
+<body class="bg-body-tertiary">
+<main class="container py-4 py-md-5">
+    <div class="row justify-content-center w-100">
+        <div class="col-12 col-md-9 col-lg-7">
+            <section class="card border-0 rounded-4 shadow-sm">
+                <div class="card-body p-4 p-md-5">
+                    <h1 class="h3 mb-4">Thêm giao dịch</h1>
+                    <p th:if="${#lists.isEmpty(categories)}">
+                        Bạn cần <a th:href="@{/categories/new}">thêm danh mục</a> trước khi tạo giao dịch.
+                    </p>
+                    <form method="post" th:action="@{/transactions}" th:object="${transactionDTO}">
+                        <div class="mb-3">
+                            <label class="form-label" for="amount">Số tiền</label>
+                            <input class="form-control" type="number" id="amount" th:field="*{amount}" min="0.01"
+                                   max="9999999999999.99"
+                                   step="0.01" required th:errorclass="is-invalid" aria-describedby="amount-error">
+                            <p class="invalid-feedback d-block" id="amount-error" th:if="${#fields.hasErrors('amount')}"
+                               th:errors="*{amount}"></p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="occurredOn">Ngày giao dịch</label>
+                            <input class="form-control" type="date" id="occurredOn" th:field="*{occurredOn}" required
+                                   th:errorclass="is-invalid" aria-describedby="occurredOn-error">
+                            <p class="invalid-feedback d-block" id="occurredOn-error"
+                               th:if="${#fields.hasErrors('occurredOn')}"
+                               th:errors="*{occurredOn}"></p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="categoryId">Danh mục</label>
+                            <select class="form-select" id="categoryId" th:field="*{categoryId}" required
+                                    th:errorclass="is-invalid" aria-describedby="categoryId-error">
+                                <option value="">Chọn danh mục</option>
+                                <option th:each="category : ${categories}" th:value="${category.id}"
+                                        th:text="${category.name}"></option>
+                            </select>
+                            <p class="invalid-feedback d-block" id="categoryId-error"
+                               th:if="${#fields.hasErrors('categoryId')}"
+                               th:errors="*{categoryId}"></p>
+                            <button class="btn btn-outline-secondary btn-sm mt-2" type="button" id="load-categories"
+                                    th:if="${hasMoreCategories}"
+                                    th:data-url="@{/transactions/categories(page=1)}">Tải thêm danh mục
+                            </button>
+                            <p class="alert alert-danger mt-2" id="category-load-error" role="alert" hidden></p>
+                            <noscript th:if="${hasMoreCategories}">Bật JavaScript để tải các danh mục còn lại.
+                            </noscript>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="note">Ghi chú</label>
+                            <textarea class="form-control" id="note" th:field="*{note}" rows="3" maxlength="1000"
+                                      aria-describedby="note-error"></textarea>
+                            <p class="invalid-feedback d-block" id="note-error" th:if="${#fields.hasErrors('note')}"
+                               th:errors="*{note}"></p>
+                        </div>
+                        <button class="btn btn-primary" type="submit" th:disabled="${#lists.isEmpty(categories)}">Lưu
+                            giao dịch
+                        </button>
+                    </form>
+                    <p class="text-center text-body-secondary mt-4 mb-0"><a th:href="@{/transactions}">Quay lại danh
+                        sách</a></p>
+                </div>
+            </section>
+        </div>
+    </div>
+</main>
+</body>
+</html>
