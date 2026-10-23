@@ -1,5 +1,6 @@
 package com.example.expensetracker.user;
 
+import com.example.expensetracker.common.util.UserAccessUtil;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -25,11 +26,7 @@ public class CurrentUserService {
             throw new AccessDeniedException(ACCESS_DENIED_MESSAGE);
         }
 
-        User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new AccessDeniedException(ACCESS_DENIED_MESSAGE));
-        if (!user.isEnabled()) {
-            throw new AccessDeniedException(ACCESS_DENIED_MESSAGE);
-        }
+        User user = UserAccessUtil.findEnabledUserByEmail(userRepository, authentication.getName());
 
         Long userId = user.getId();
         return userId;

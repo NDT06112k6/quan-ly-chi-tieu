@@ -70,6 +70,9 @@ class HomeControllerTests {
                 .andExpect(model().attribute("currentYear", currentDate.getYear()))
                 .andExpect(content().string(containsString("Chào mừng đến với Expense Tracker")))
                 .andExpect(content().string(containsString("Thêm giao dịch ngay")))
+                .andExpect(content().string(containsString("chart.js@4.5.1/dist/chart.umd.min.js")))
+                .andExpect(content().string(containsString("/js/dashboard-chart.js")))
+                .andExpect(content().string(containsString("id=\"expense-chart\"")))
                 .andExpect(content().string(containsString("method=\"post\" action=\"/logout\"")))
                 .andExpect(content().string(containsString("name=\"_csrf\"")))
                 .andExpect(content().string(containsString("Đăng xuất")));

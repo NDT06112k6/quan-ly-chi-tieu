@@ -63,6 +63,32 @@ Existing prefixed hashes require an explicit migration or password reset before
 they can authenticate with this encoder. No existing hashes are changed here.
 There are no new environment variables or cache settings for this change.
 
+## User profile
+
+Authenticated users can open `GET /profile` from the dashboard to view their
+email and display name, and submit `POST /profile/change-password` with
+`oldPassword` and `newPassword`. The account is resolved from authentication;
+submitted email, ID, role and display name fields cannot select or modify an
+account. Controllers expose `UserProfileDTO`, containing only email and display
+name. Missing or disabled accounts are denied.
+
+`UserService.changePassword(email, oldPassword, newPassword)` checks the old
+password with the injected `PasswordEncoder.matches`, encodes the new password,
+and updates the stored hash. The existing BCrypt encoder configuration remains
+in use. New passwords have 8–72 characters and at most 72 UTF-8 bytes, matching
+registration. Passwords are not trimmed, logged, placed in URLs, or repopulated
+after errors. The form uses `@Valid`, field errors and CSRF protection. Invalid
+input or an incorrect old password returns the profile form with HTTP 400;
+success redirects to `/profile?success`.
+
+The update matches both account email and the previous hash, and requires the
+account to remain enabled. A concurrent password change cannot overwrite a newer
+hash and produces an explicit error instead. Only the password hash changes.
+The new password applies to subsequent logins; existing authenticated sessions
+remain active. There is no password hash migration, schema change, new dependency,
+environment variable or server cache change. Refresh open dashboards to see the
+new profile link.
+
 ## Categories
 
 Authenticated users can list their categories at `GET /categories`, open the
@@ -117,6 +143,53 @@ category names in one user-scoped, bounded query for the current transaction
 page. No new dependencies, schema changes, environment variables or cache
 resets are required.
 
+The transaction list also accepts optional `keyword`, `categoryId`, `startDate`
+and `endDate` query parameters. A validated `TransactionFilterDTO` binds these
+parameters so the controller signature stays short. The Bootstrap GET search
+form keeps submitted values, resets pagination on a new search, and preserves
+all filters in previous/next links. "Xóa bộ lọc" returns to the unfiltered list.
+The owned-category dropdown supports loading more categories and retains a
+selected category beyond its initial 100 options.
+
+The service uses a paginated, parameterized repository query that always filters
+by authenticated `userId`. Optional criteria are combined with AND. The keyword
+is trimmed and matched as a literal substring of `note` using `LOCATE`, including
+characters such as `%` and `_`; matching follows the MySQL column collation.
+An omitted or blank keyword includes transactions whose note is null. Dates use
+`yyyy-MM-dd`, are inclusive, and can be supplied independently. Dates must be in
+MySQL's 1000–9999 year range and start cannot exceed end. Invalid filters return
+HTTP 400 with the existing structured error response; a foreign category filter
+returns no transactions and never exposes that category's name. The default
+20-row page and date/ID descending ordering remain unchanged. There are no new
+dependencies, schema migrations, environment variables or server cache settings.
+Refresh open transaction lists to load the search form.
+
+`GET /transactions/export` downloads `transactions.csv` using
+`Content-Disposition: attachment; filename=transactions.csv` and
+`Content-Type: text/csv;charset=UTF-8`. The transaction list includes an
+"Xuất tất cả CSV" link. The export always contains all transactions belonging
+to the authenticated user, including income and expenses across all dates;
+list filters, page numbers and supplied owner IDs do not limit or change it.
+
+The CSV columns are `Ngày`, `Danh mục`, `Số tiền`, `Ghi chú`. Dates use
+`yyyy-MM-dd`, monetary values use `BigDecimal.toPlainString()`, and null notes
+become empty fields. Records use CRLF; commas, quotes and embedded line breaks
+are escaped following [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180.html).
+A UTF-8 BOM helps spreadsheet applications recognize Vietnamese text. Text
+starting with formula-like characters (including after leading whitespace) is
+prefixed with an apostrophe and quoted, following the text-escaping approach
+described by [OWASP](https://owasp.org/www-community/attacks/CSV_Injection).
+This affects only the downloaded representation, not the stored data.
+
+The service reads DTO projections in slices of 100 rows within a read-only
+transaction, ordered by date descending then ID descending. Both joined tables
+are filtered by `user_id`; no unpaginated entity list or per-row category lookup
+is used. The final CSV is assembled in memory before the response is sent, so
+its memory use grows with the exported file size. Database failures remain errors
+instead of producing a successful empty file. Responses use `Cache-Control:
+no-store`. No dependencies, schema, environment or server cache settings change;
+refresh the transaction list to see the export link.
+
 ## Budgets
 
 Authenticated users can open `GET /budgets`, create or update a budget through
@@ -165,6 +238,31 @@ totals retain two decimal places, including zero and negative balances.
 The Bootstrap cards stack on small screens. No new dependencies, schema
 migrations, environment variables or cache resets are required.
 
+The dashboard also displays a category expense pie chart using
+[Chart.js 4.5.1](https://github.com/chartjs/Chart.js/releases/tag/v4.5.1), loaded
+from jsDelivr as a UMD script. The browser must be able to reach this CDN.
+`dashboard-chart.js` fetches `GET /api/dashboard/chart` with the logged-in session.
+Each JSON item contains `categoryName` and `totalAmount`. Only `CHI` transactions
+in the server's current calendar month are included; both the transactions and
+joined categories are filtered by the authenticated user ID. Request parameters
+cannot change the owner or reporting month. Categories with the same name are
+grouped separately by category ID.
+
+The endpoint uses zero-based `page` and `size` (default and maximum 100), returning
+a JSON array and an `X-Has-Next` response header. The chart fetches all pages before
+drawing, so categories beyond the first page are included in the proportions.
+SQL aggregation and Java DTOs use `BigDecimal`; JavaScript numbers are used only
+to draw the chart and format its tooltips. The chart shows amounts and percentages
+when a segment is hovered or tapped. Report responses use `Cache-Control: no-store`.
+Invalid pagination and unavailable accounts return the shared JSON error shape;
+database errors return HTTP 500 rather than empty results.
+
+A successful empty report displays a message that the month has no expenses.
+API, session, or chart library failures display a separate error with a retry
+button; partial paginated results are never drawn. No Maven dependencies, schema
+migrations or environment variables are added. Refresh an open dashboard to load
+the new scripts; no server cache reset is required.
+
 ## Global exception handling
 
 `common.exception.GlobalExceptionHandler` handles `IllegalArgumentException`
@@ -184,7 +282,7 @@ are required. Refresh open pages to load the new error template when an error oc
 
 ## Interface
 
-All ten Thymeleaf pages use Bootstrap 5.3.8 CSS through jsDelivr, pinned with
+All eleven Thymeleaf pages use Bootstrap 5.3.8 CSS through jsDelivr, pinned with
 the integrity hash from the [official Bootstrap documentation](https://getbootstrap.com/docs/5.3/getting-started/introduction/).
 Login and registration use centered responsive cards. Forms, buttons, validation
 feedback, bordered tables and pagination use Bootstrap classes. The old local
@@ -211,3 +309,5 @@ Use a separate test database by setting `SPRING_DATASOURCE_URL`,
 The transaction dropdown's JavaScript tests use Node's built-in test runner,
 without npm dependencies. With Node 24, run
 `node --test --test-isolation=none src/test/js/transaction-form.test.cjs`.
+Run the chart tests with
+`node --test --test-isolation=none src/test/js/dashboard-chart.test.cjs`.

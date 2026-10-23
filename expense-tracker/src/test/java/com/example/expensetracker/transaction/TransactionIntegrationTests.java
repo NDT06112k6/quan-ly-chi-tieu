@@ -93,6 +93,8 @@ class TransactionIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(view().name("transaction/form"))
                 .andExpect(content().string(containsString("My category")))
+                .andExpect(content().string(containsString(
+                        "<option value=\"" + ownerCategory.getId() + "\">My category</option>")))
                 .andExpect(content().string(not(containsString("Foreign private category"))))
                 .andExpect(content().string(containsString("name=\"_csrf\"")))
                 .andReturn();

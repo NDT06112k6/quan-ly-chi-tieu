@@ -1,5 +1,8 @@
 package com.example.expensetracker.config;
 
+import com.example.expensetracker.home.DashboardApiController;
+import com.example.expensetracker.user.UserProfileController;
+import com.example.expensetracker.transaction.TransactionController;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -23,6 +26,12 @@ public class SecurityConfig {
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(LOGIN_URL, REGISTER_URL, CSS_PATTERN, JS_PATTERN)
                 .permitAll()
+                .requestMatchers(DashboardApiController.CHART_PATH)
+                .authenticated()
+                .requestMatchers(UserProfileController.PROFILE_PATH, UserProfileController.CHANGE_PASSWORD_PATH)
+                .authenticated()
+                .requestMatchers(TransactionController.EXPORT_PATH)
+                .authenticated()
                 .anyRequest()
                 .authenticated());
         http.formLogin(form -> form

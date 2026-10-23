@@ -1,7 +1,9 @@
 package com.example.expensetracker.transaction;
 
+import com.example.expensetracker.home.CategoryExpenseDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -10,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,11 +25,60 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     Page<Transaction> findByUserId(Long userId, Pageable pageable);
 
+    @Query("""
+            SELECT new com.example.expensetracker.transaction.TransactionExportDTO(
+                transaction.occurredOn, category.name, transaction.amount, transaction.note)
+            FROM Transaction transaction
+            JOIN Category category ON category.id = transaction.categoryId
+                AND category.userId = transaction.userId
+            WHERE transaction.userId = :userId
+                AND category.userId = :userId
+            ORDER BY transaction.occurredOn DESC, transaction.id DESC
+            """)
+    Slice<TransactionExportDTO> findExportRowsByUserId(@Param("userId") Long userId, Pageable pageable);
+
+    @Query("""
+            SELECT transaction FROM Transaction transaction
+            WHERE transaction.userId = :userId
+                AND (:#{#filters.keyword} IS NULL OR LOCATE(:#{#filters.keyword}, transaction.note) > 0)
+                AND (:#{#filters.categoryId} IS NULL OR transaction.categoryId = :#{#filters.categoryId})
+                AND (:#{#filters.startDate} IS NULL OR transaction.occurredOn >= :#{#filters.startDate})
+                AND (:#{#filters.endDate} IS NULL OR transaction.occurredOn <= :#{#filters.endDate})
+            """)
+    Page<Transaction> searchByUserId(@Param("userId") Long userId,
+            @Param("filters") TransactionFilterDTO filters, Pageable pageable);
+
     List<Transaction> findAllByUserId(Long userId);
 
     Optional<Transaction> findByIdAndUserId(Long id, Long userId);
 
     boolean existsByIdAndUserId(Long id, Long userId);
+
+    @Query(value = """
+            SELECT new com.example.expensetracker.home.CategoryExpenseDTO(category.name, SUM(transaction.amount))
+            FROM Transaction transaction
+            JOIN Category category ON category.id = transaction.categoryId
+                AND category.userId = transaction.userId
+            WHERE transaction.userId = :userId
+                AND category.userId = :userId
+                AND category.type = com.example.expensetracker.category.CategoryType.CHI
+                AND MONTH(transaction.occurredOn) = :#{#month.monthValue}
+                AND YEAR(transaction.occurredOn) = :#{#month.year}
+            GROUP BY category.id, category.name
+            ORDER BY category.id ASC
+            """, countQuery = """
+            SELECT COUNT(DISTINCT category.id)
+            FROM Transaction transaction
+            JOIN Category category ON category.id = transaction.categoryId
+                AND category.userId = transaction.userId
+            WHERE transaction.userId = :userId
+                AND category.userId = :userId
+                AND category.type = com.example.expensetracker.category.CategoryType.CHI
+                AND MONTH(transaction.occurredOn) = :#{#month.monthValue}
+                AND YEAR(transaction.occurredOn) = :#{#month.year}
+            """)
+    Page<CategoryExpenseDTO> sumExpensesByCategoryForUserAndMonth(
+            @Param("userId") Long userId, @Param("month") YearMonth month, Pageable pageable);
 
     @Query("""
             SELECT COALESCE(SUM(transaction.amount), 0)

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -14,6 +16,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionServiceTests {
@@ -23,6 +27,15 @@ class TransactionServiceTests {
 
     @Mock
     private CategoryRepository categoryRepository;
+
+    @Test
+    void preservesExportDatabaseFailureRatherThanReturningHeaderOnlySuccess() {
+        Long userId = 42L;
+        DataAccessResourceFailureException failure = new DataAccessResourceFailureException("Test database failure");
+        when(transactionRepository.findExportRowsByUserId(eq(userId), any(Pageable.class))).thenThrow(failure);
+        TransactionService transactionService = new TransactionService(transactionRepository, categoryRepository);
+        assertThatThrownBy(() -> transactionService.exportTransactionsCsv(userId)).isSameAs(failure);
+    }
 
     @Test
     void stopsBeforePersistenceWhenCategoryOwnershipCheckFails() {

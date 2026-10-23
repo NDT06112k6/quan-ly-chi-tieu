@@ -8,6 +8,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -28,7 +29,7 @@ public class TransactionExceptionHandler {
     }
 
     @ExceptionHandler({ConstraintViolationException.class, MethodArgumentTypeMismatchException.class,
-            HandlerMethodValidationException.class})
+            HandlerMethodValidationException.class, MethodArgumentNotValidException.class})
     public ResponseEntity<ErrorResponse> handleInvalidRequest() {
         ResponseEntity<ErrorResponse> response = ErrorResponseUtil.build(
                 HttpStatus.BAD_REQUEST, INVALID_REQUEST_CODE, INVALID_REQUEST_MESSAGE);

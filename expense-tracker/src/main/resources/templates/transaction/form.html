@@ -42,8 +42,9 @@
                             <select class="form-select" id="categoryId" th:field="*{categoryId}" required
                                     th:errorclass="is-invalid" aria-describedby="categoryId-error">
                                 <option value="">Chọn danh mục</option>
-                                <option th:each="category : ${categories}" th:value="${category.id}"
-                                        th:text="${category.name}"></option>
+                                <option th:each="cat : ${categories}"
+                                        th:value="${cat.id}"
+                                        th:text="${cat.name}"></option>
                             </select>
                             <p class="invalid-feedback d-block" id="categoryId-error"
                                th:if="${#fields.hasErrors('categoryId')}"

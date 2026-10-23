@@ -1,16 +1,21 @@
 package com.example.expensetracker.user;
 
+import com.example.expensetracker.common.util.PasswordUtil;
+import com.example.expensetracker.common.util.UserAccessUtil;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.nio.charset.StandardCharsets;
+import org.springframework.validation.annotation.Validated;
 
 @Service
+@Validated
 public class UserService {
 
     private static final String DEFAULT_ROLE = "USER";
-    private static final int BCRYPT_MAX_PASSWORD_BYTES = 72;
+    private static final int EXPECTED_UPDATE_COUNT = 1;
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -36,13 +41,40 @@ public class UserService {
         userRepository.saveAndFlush(user);
     }
 
+    @Transactional(readOnly = true)
+    public UserProfileDTO getProfile(@NotBlank @Email @Size(max = 255) String email) {
+        User user = UserAccessUtil.findEnabledUserByEmail(userRepository, email);
+        UserProfileDTO profile = new UserProfileDTO(user.getEmail(), user.getDisplayName());
+        return profile;
+    }
+
+    @Transactional
+    public void changePassword(@NotBlank @Email @Size(max = 255) String email,
+            @NotBlank @Size(max = UserRegisterDTO.MAX_PASSWORD_LENGTH) String oldPassword,
+            @NotBlank @Size(min = UserRegisterDTO.MIN_PASSWORD_LENGTH,
+                    max = UserRegisterDTO.MAX_PASSWORD_LENGTH) String newPassword) {
+        User user = UserAccessUtil.findEnabledUserByEmail(userRepository, email);
+        if (!PasswordUtil.isWithinBcryptLimit(oldPassword)
+                || !passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
+            throw UserPasswordChangeException.incorrectOldPassword();
+        }
+        if (!PasswordUtil.isWithinBcryptLimit(newPassword)) {
+            throw UserPasswordChangeException.passwordExceedsBcryptLimit();
+        }
+        String newPasswordHash = passwordEncoder.encode(newPassword);
+        // Compare the stored hash to prevent concurrent requests from overwriting a newer password.
+        int updatedRows = userRepository.updatePasswordIfUnchanged(email, user.getPasswordHash(), newPasswordHash);
+        if (updatedRows != EXPECTED_UPDATE_COUNT) {
+            throw UserPasswordChangeException.passwordChangedConcurrently();
+        }
+    }
+
     private void validatePassword(UserRegisterDTO dto) {
         if (!dto.getPassword().equals(dto.getConfirmPassword())) {
             throw UserRegistrationException.passwordsDoNotMatch();
         }
 
-        int passwordByteLength = dto.getPassword().getBytes(StandardCharsets.UTF_8).length;
-        if (passwordByteLength > BCRYPT_MAX_PASSWORD_BYTES) {
+        if (!PasswordUtil.isWithinBcryptLimit(dto.getPassword())) {
             throw UserRegistrationException.passwordExceedsBcryptLimit();
         }
     }
