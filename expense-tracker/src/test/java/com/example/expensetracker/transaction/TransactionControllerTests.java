@@ -48,6 +48,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 
 @WebMvcTest(TransactionController.class)
 @Import(SecurityConfig.class)
@@ -223,7 +224,8 @@ class TransactionControllerTests {
     void updatesUsingThePathIdAndCurrentUserRatherThanSubmittedOwnership() throws Exception {
         mockMvc.perform(validEditRequest().param("id", "999").param("userId", "99"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl(DETAIL_PATH));
+                .andExpect(redirectedUrl(DETAIL_PATH))
+                .andExpect(flash().attribute("success", "Cập nhật giao dịch thành công!"));
 
         ArgumentCaptor<TransactionDTO> dtoCaptor = ArgumentCaptor.forClass(TransactionDTO.class);
         verify(transactionService).updateTransaction(eq(TRANSACTION_ID), dtoCaptor.capture(), eq(USER_ID));
@@ -243,6 +245,7 @@ class TransactionControllerTests {
 
         assertThat(result.getResponse().getContentAsString()).contains("Số tiền phải lớn hơn 0.",
                 "action=\"" + EDIT_PATH + "\"", "name=\"_csrf\"");
+        assertThat(result.getFlashMap().isEmpty()).isTrue();
         verify(transactionService).getTransactionForEdit(TRANSACTION_ID, USER_ID);
     }
 
@@ -259,7 +262,8 @@ class TransactionControllerTests {
     void deletesWithCsrfAndRedirectsToTheList() throws Exception {
         mockMvc.perform(post(DELETE_PATH).with(user(USERNAME)).with(csrf()).param("userId", "99"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/transactions"));
+                .andExpect(redirectedUrl("/transactions"))
+                .andExpect(flash().attribute("success", "Xóa giao dịch thành công!"));
 
         verify(transactionService).deleteTransaction(TRANSACTION_ID, USER_ID);
     }

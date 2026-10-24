@@ -3,6 +3,8 @@ package com.example.expensetracker.transaction;
 import com.example.expensetracker.category.CategoryDTO;
 import com.example.expensetracker.category.CategoryOptionsDTO;
 import com.example.expensetracker.common.util.CategoryViewHelper;
+import com.example.expensetracker.common.util.FlashMessageUtil;
+import com.example.expensetracker.common.util.FormViewUtil;
 import com.example.expensetracker.user.CurrentUserService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -17,7 +19,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.WebDataBinder;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
@@ -47,6 +49,9 @@ public class TransactionController {
     private static final String DETAIL_VIEW = "transaction/detail";
     private static final String DETAIL_REDIRECT = "redirect:/transactions/";
     private static final String LIST_REDIRECT = "redirect:/transactions";
+    private static final String CREATE_SUCCESS_MESSAGE = "Thêm giao dịch thành công!";
+    private static final String UPDATE_SUCCESS_MESSAGE = "Cập nhật giao dịch thành công!";
+    private static final String DELETE_SUCCESS_MESSAGE = "Xóa giao dịch thành công!";
     private static final String CSV_ATTACHMENT = "attachment; filename=transactions.csv";
     private static final MediaType CSV_MEDIA_TYPE = new MediaType("text", "csv", StandardCharsets.UTF_8);
 
@@ -100,16 +105,20 @@ public class TransactionController {
     }
 
     @PostMapping
-    public String createTransaction(@Valid @ModelAttribute(TransactionDTO.MODEL_ATTRIBUTE) TransactionDTO dto,
-            BindingResult bindingResult, Model model) {
+    public ModelAndView createTransaction(@Valid @ModelAttribute(TransactionDTO.MODEL_ATTRIBUTE) TransactionDTO dto,
+            BindingResult bindingResult, RedirectAttributes redirectAttributes) {
         Long userId = currentUserService.getUserId();
         if (bindingResult.hasErrors()) {
+            Model model = FormViewUtil.getBindingModel(bindingResult);
             categoryViewHelper.populateCategoryOptions(model, userId, dto.getCategoryId());
-            return FORM_VIEW;
+            ModelAndView response = new ModelAndView(FORM_VIEW, model.asMap());
+            return response;
         }
 
         transactionService.createTransaction(dto, userId);
-        return LIST_REDIRECT;
+        FlashMessageUtil.addSuccess(redirectAttributes, CREATE_SUCCESS_MESSAGE);
+        ModelAndView response = new ModelAndView(LIST_REDIRECT);
+        return response;
     }
 
     @GetMapping("/{id}")
@@ -133,29 +142,36 @@ public class TransactionController {
 
     @PostMapping("/{id}/edit")
     public ModelAndView updateTransaction(@PathVariable("id") @Positive Long transactionId,
-            @Valid @ModelAttribute(TransactionDTO.MODEL_ATTRIBUTE) TransactionDTO dto, BindingResult bindingResult) {
+            @Valid @ModelAttribute(TransactionDTO.MODEL_ATTRIBUTE) TransactionDTO dto, BindingResult bindingResult,
+            RedirectAttributes redirectAttributes) {
         Long userId = currentUserService.getUserId();
         if (bindingResult.hasErrors()) {
-            transactionService.getTransactionForEdit(transactionId, userId);
-            Model model = new ExtendedModelMap();
-            model.addAllAttributes(bindingResult.getModel());
-            populateEditModel(model, transactionId, userId);
-            ModelAndView response = new ModelAndView(FORM_VIEW, model.asMap());
-            response.setStatus(HttpStatus.BAD_REQUEST);
+            ModelAndView response = buildInvalidEditResponse(transactionId, userId, bindingResult);
             return response;
         }
 
         transactionService.updateTransaction(transactionId, dto, userId);
+        FlashMessageUtil.addSuccess(redirectAttributes, UPDATE_SUCCESS_MESSAGE);
         ModelAndView response = new ModelAndView(DETAIL_REDIRECT + transactionId);
         return response;
     }
 
     @PostMapping("/{id}/delete")
     public String deleteTransaction(@PathVariable("id") @Positive Long transactionId,
-            Authentication authentication) {
+            Authentication authentication, RedirectAttributes redirectAttributes) {
         Long userId = currentUserService.getUserId(authentication);
         transactionService.deleteTransaction(transactionId, userId);
+        FlashMessageUtil.addSuccess(redirectAttributes, DELETE_SUCCESS_MESSAGE);
         return LIST_REDIRECT;
+    }
+
+    private ModelAndView buildInvalidEditResponse(Long transactionId, Long userId, BindingResult bindingResult) {
+        transactionService.getTransactionForEdit(transactionId, userId);
+        Model model = FormViewUtil.getBindingModel(bindingResult);
+        populateEditModel(model, transactionId, userId);
+        ModelAndView response = new ModelAndView(FORM_VIEW, model.asMap());
+        response.setStatus(HttpStatus.BAD_REQUEST);
+        return response;
     }
 
     private void populateEditModel(Model model, Long transactionId, Long userId) {

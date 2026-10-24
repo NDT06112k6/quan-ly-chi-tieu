@@ -75,7 +75,7 @@ class UserRegistrationIntegrationTests {
 
         mockMvc.perform(registrationRequest(dto).param("role", "ADMIN").param("enabled", "false"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/login?success"))
+                .andExpect(redirectedUrl("/login"))
                 .andExpect(unauthenticated());
 
         User user = userRepository.findByEmail(email).orElseThrow();

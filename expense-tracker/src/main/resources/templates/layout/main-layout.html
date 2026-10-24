@@ -16,6 +16,8 @@
         <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
                 integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
                 crossorigin="anonymous"></script>
+        <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+        <script defer th:src="@{/js/toast-notifications.js}"></script>
     </head>
     <body th:class="${#authorization.expression('isAuthenticated()') ? 'is-signed-in' : 'is-guest'}">
     <a class="visually-hidden-focusable skip-link" href="#main-content">Đi đến nội dung chính</a>
@@ -169,6 +171,19 @@
         <footer class="app-footer px-4 pb-4 text-center text-body-secondary">
             <small>Expense Tracker · Chủ động chi tiêu, vững vàng kế hoạch.</small>
         </footer>
+    </div>
+    <div id="toast-notifications" hidden
+         th:with="querySuccess=${param.success != null ? param.success[0] : ''},
+                  queryError=${param.error != null ? param.error[0] : ''},
+                  flashError=${error instanceof T(java.lang.String) ? error : null},
+                  defaultSuccess=${activePage == 'login' ? 'Đăng ký thành công. Bạn có thể đăng nhập ngay.' : (activePage == 'profile' ? 'Đổi mật khẩu thành công.' : 'Thao tác thành công!')},
+                  defaultError=${activePage == 'login' ? 'Email hoặc mật khẩu không đúng, hoặc tài khoản đã bị khóa.' : 'Đã xảy ra lỗi. Vui lòng thử lại.'}">
+        <span id="toast-error" data-toast-icon="error"
+              th:if="${flashError != null or param.error != null}"
+              th:text="${flashError != null ? flashError : (#strings.isEmpty(queryError) ? defaultError : queryError)}"></span>
+        <span id="toast-success" data-toast-icon="success"
+              th:if="${success != null or param.success != null or param.logout != null}"
+              th:text="${success != null ? success : (param.logout != null ? 'Bạn đã đăng xuất thành công.' : (#strings.isEmpty(querySuccess) ? defaultSuccess : querySuccess))}"></span>
     </div>
     </body>
     </html>

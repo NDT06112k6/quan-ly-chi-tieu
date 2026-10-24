@@ -1,5 +1,6 @@
 package com.example.expensetracker.user;
 
+import com.example.expensetracker.common.util.FlashMessageUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 @RequestMapping(UserProfileController.PROFILE_PATH)
@@ -22,7 +24,8 @@ public class UserProfileController {
     public static final String PROFILE_PATH = "/profile";
     public static final String CHANGE_PASSWORD_PATH = "/profile/change-password";
     static final String PROFILE_VIEW = "profile/view";
-    private static final String SUCCESS_REDIRECT = "redirect:/profile?success";
+    private static final String SUCCESS_REDIRECT = "redirect:/profile";
+    private static final String PASSWORD_SUCCESS_MESSAGE = "Đổi mật khẩu thành công.";
     private final UserService userService;
 
     public UserProfileController(UserService userService) {
@@ -51,17 +54,25 @@ public class UserProfileController {
     @PostMapping("/change-password")
     public ModelAndView changePassword(@Valid @ModelAttribute(PasswordChangeDTO.MODEL_ATTRIBUTE) PasswordChangeDTO dto,
             BindingResult bindingResult,
-            @ModelAttribute(name = UserProfileDTO.MODEL_ATTRIBUTE, binding = false) UserProfileDTO profile) {
+            @ModelAttribute(name = UserProfileDTO.MODEL_ATTRIBUTE, binding = false) UserProfileDTO profile,
+            RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            dto.clearPasswords();
-            ModelAndView modelAndView = new ModelAndView(PROFILE_VIEW, bindingResult.getModel());
-            modelAndView.addObject(UserProfileDTO.MODEL_ATTRIBUTE, profile);
-            modelAndView.setStatus(HttpStatus.BAD_REQUEST);
+            ModelAndView modelAndView = buildInvalidPasswordResponse(dto, bindingResult, profile);
             return modelAndView;
         }
         userService.changePassword(profile.email(), dto.getOldPassword(), dto.getNewPassword());
         dto.clearPasswords();
+        FlashMessageUtil.addSuccess(redirectAttributes, PASSWORD_SUCCESS_MESSAGE);
         ModelAndView modelAndView = new ModelAndView(SUCCESS_REDIRECT);
+        return modelAndView;
+    }
+
+    private ModelAndView buildInvalidPasswordResponse(PasswordChangeDTO dto, BindingResult bindingResult,
+            UserProfileDTO profile) {
+        dto.clearPasswords();
+        ModelAndView modelAndView = new ModelAndView(PROFILE_VIEW, bindingResult.getModel());
+        modelAndView.addObject(UserProfileDTO.MODEL_ATTRIBUTE, profile);
+        modelAndView.setStatus(HttpStatus.BAD_REQUEST);
         return modelAndView;
     }
 }

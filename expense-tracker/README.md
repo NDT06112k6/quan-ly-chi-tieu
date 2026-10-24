@@ -29,7 +29,7 @@ and `/js/**`. All other application requests require authentication. CSRF
 protection remains enabled, including for login, registration and logout forms.
 `GET /login` and `GET /register` render the Thymeleaf pages in
 `templates/user/`. Registration submits to `POST /register` and redirects to
-`/login?success` after the account is saved. The form validates email (up to
+`/login` with a success flash message after the account is saved. The form validates email (up to
 255 characters), display name (up to 100 characters), and matching passwords
 (8–72 characters and at most 72 UTF-8 bytes, as required by BCrypt). New
 accounts receive role `USER` and are enabled. Roles and account status are
@@ -79,7 +79,7 @@ in use. New passwords have 8–72 characters and at most 72 UTF-8 bytes, matchin
 registration. Passwords are not trimmed, logged, placed in URLs, or repopulated
 after errors. The form uses `@Valid`, field errors and CSRF protection. Invalid
 input or an incorrect old password returns the profile form with HTTP 400;
-success redirects to `/profile?success`.
+success redirects to `/profile` with a success flash message.
 
 The update matches both account email and the previous hash, and requires the
 account to remain enabled. A concurrent password change cannot overwrite a newer
@@ -330,8 +330,8 @@ Bootstrap 5.3.8 CSS and its JavaScript bundle load through jsDelivr with integri
 hashes. The bundle powers the mobile menu. Local `/css/app.css` supplies the shared
 green palette, spacing, forms, tables, dashboard cards and responsive rules.
 The interface includes a keyboard skip link, visible focus states, accessible
-menu controls and reduced-motion support. Browsers need CDN access for Bootstrap
-and Chart.js. Refresh open pages to load the updated templates and stylesheet;
+menu controls and reduced-motion support. Browsers need CDN access for Bootstrap,
+Chart.js and SweetAlert2. Refresh open pages to load the updated templates and stylesheet;
 there are no new Maven dependencies, environment variables, schema changes or
 server cache settings.
 
@@ -340,6 +340,35 @@ red for `CHI` and green for `THU` using the actual category type from the same
 user-scoped category query that resolves category names. Color is never inferred
 from the amount's sign. Validation, CSRF, ownership checks and pagination remain
 active.
+
+## Toast notifications
+
+The master layout loads [SweetAlert2 11](https://sweetalert2.github.io/) from
+jsDelivr and `/js/toast-notifications.js` with deferred scripts in dependency
+order. Notifications use `toast: true`, `position: "top-end"`, a 3000 ms timer
+and a progress bar, without a confirmation button or backdrop. A close button
+allows early dismissal. Multiple messages display sequentially.
+
+Successful registration, password changes, category creation, transaction
+creation/update/deletion and budget saves use `RedirectAttributes` success
+flash attributes through `FlashMessageUtil`. Registration now redirects to
+`/login` and password changes to `/profile`, without a `?success` marker.
+Flash text is consumed on the next matching request and is absent after a
+refresh. Validation failures keep their form and field errors; failed service
+calls retain existing exception handling and never add a success flash.
+
+The layout uses `th:if` to support `success` and string-valued `error` flash
+attributes, plus `?success=message` and `?error=message` URL parameters. Empty
+URL flags have friendly defaults, including the existing login, password-change
+and `?logout` notifications. Flash text takes priority over URL text of the same
+type. URL parameters remain in the address bar and therefore display again on
+refresh; use flash attributes for notifications following application actions.
+
+Messages are escaped with `th:text` and passed to SweetAlert2 as `titleText`,
+never HTML or executable inline JavaScript. Structured error-page DTOs are not
+treated as error flash text. Browsers need access to the SweetAlert2 CDN.
+Refresh open pages to load the shared script; no Maven/npm dependencies,
+database migrations, environment variables or server cache resets are added.
 
 ## Verification
 
@@ -356,3 +385,5 @@ without npm dependencies. With Node 24, run
 `node --test --test-isolation=none src/test/js/transaction-form.test.cjs`.
 Run the chart tests with
 `node --test --test-isolation=none src/test/js/dashboard-chart.test.cjs`.
+Run notification tests with
+`node --test --test-isolation=none src/test/js/toast-notifications.test.cjs`.

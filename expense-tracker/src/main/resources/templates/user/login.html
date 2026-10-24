@@ -8,12 +8,6 @@
                         <p class="text-primary fw-bold mb-4">Expense Tracker</p>
                         <h1 class="h3 mb-3">Đăng nhập</h1>
                         <p class="text-body-secondary mb-4">Chào mừng bạn trở lại.</p>
-                        <p class="alert alert-success" role="status" th:if="${param.success != null}">
-                            Đăng ký thành công. Bạn có thể đăng nhập ngay.
-                        </p>
-                        <p class="alert alert-success" role="status" th:if="${param.logout != null}">
-                            Bạn đã đăng xuất thành công.
-                        </p>
 
                         <form method="post" th:action="@{/login}" th:object="${userLoginDTO}">
                             <div class="alert alert-danger" role="alert" th:if="${#fields.hasGlobalErrors()}"

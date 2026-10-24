@@ -11,6 +11,8 @@ import com.example.expensetracker.user.UserService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -19,6 +21,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -30,6 +33,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest({HomeController.class, UserController.class})
@@ -100,6 +107,88 @@ class LayoutControllerTests {
         verifyNoInteractions(userService, currentUserService, transactionService);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"success", "error"})
+    void escapesUrlNotificationTextRatherThanRenderingHtml(String notificationType) throws Exception {
+        MvcResult result = mockMvc.perform(get("/login").param(notificationType, "<script>alert(1)</script>"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString())
+                .contains("id=\"toast-" + notificationType + "\"", "data-toast-icon=\"" + notificationType + "\"",
+                        "&lt;script&gt;alert(1)&lt;/script&gt;")
+                .doesNotContain("<script>alert(1)</script>");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"success", "error"})
+    void prefersFlashMessagesOverUrlMessages(String notificationType) throws Exception {
+        MvcResult result = mockMvc.perform(get("/login")
+                        .param(notificationType, "URL message")
+                        .flashAttr(notificationType, "Flash message"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString())
+                .contains("id=\"toast-" + notificationType + "\"", ">Flash message</span>")
+                .doesNotContain("URL message");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"success, Đăng ký thành công.", "logout, Bạn đã đăng xuất thành công.",
+            "error, Email hoặc mật khẩu không đúng"})
+    void supportsLegacyUrlFlagsWithFriendlyDefaultMessages(String flag, String expectedMessage) throws Exception {
+        MvcResult result = mockMvc.perform(get("/login").param(flag, ""))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString()).contains(expectedMessage);
+    }
+
+    @Test
+    void doesNotCreateToastsWhenNoNotificationExists() throws Exception {
+        MvcResult result = mockMvc.perform(get("/login"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("id=\"toast-success\"", "id=\"toast-error\"");
+    }
+
+    @Test
+    void doesNotTreatStructuredErrorResponsesAsFlashText() throws Exception {
+        stubDashboard("Minh");
+        when(currentUserService.getUserId(any(Authentication.class))).thenThrow(new AccessDeniedException("Denied"));
+
+        MvcResult result = mockMvc.perform(get("/").with(user(USERNAME)))
+                .andExpect(status().isForbidden())
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("id=\"toast-error\"", "ErrorResponse[");
+    }
+
+    @Test
+    void displaysRegistrationFlashOnlyOnTheFirstRedirectedRequest() throws Exception {
+        MvcResult registration = mockMvc.perform(post("/register").with(csrf())
+                        .param("displayName", "Minh").param("email", USERNAME)
+                        .param("password", "test-password").param("confirmPassword", "test-password"))
+                .andExpect(redirectedUrl("/login"))
+                .andExpect(flash().attribute("success", "Đăng ký thành công. Bạn có thể đăng nhập ngay."))
+                .andReturn();
+        MockHttpSession session = (MockHttpSession) registration.getRequest().getSession(false);
+
+        MvcResult redirected = mockMvc.perform(get("/login").session(session))
+                .andExpect(status().isOk())
+                .andReturn();
+        MvcResult refreshed = mockMvc.perform(get("/login").session(session))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(redirected.getResponse().getContentAsString()).contains("id=\"toast-success\"");
+        assertThat(refreshed.getResponse().getContentAsString()).doesNotContain("id=\"toast-success\"");
+    }
+
     private void stubDashboard(String displayName) {
         LocalDate today = LocalDate.now();
         DashboardDTO dashboard = new DashboardDTO(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
@@ -117,7 +206,8 @@ class LayoutControllerTests {
                 .containsOnlyOnce("<body")
                 .containsOnlyOnce("id=\"main-content\"")
                 .containsOnlyOnce("bootstrap@5.3.8/dist/css");
-        assertThat(html).contains("/css/app.css", "bootstrap.bundle.min.js");
+        assertThat(html).contains("/css/app.css", "bootstrap.bundle.min.js",
+                "sweetalert2@11/dist/sweetalert2.all.min.js", "/js/toast-notifications.js");
         assertThat(html).doesNotContain("th:replace", "th:fragment", "<th:block");
     }
 }

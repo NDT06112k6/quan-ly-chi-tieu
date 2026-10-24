@@ -87,7 +87,7 @@ class UserProfileIntegrationTests {
                         .param("email", otherUser.getEmail()).param("id", otherUser.getId().toString())
                         .param("role", "ADMIN").param("displayName", "Changed name"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/profile?success"));
+                .andExpect(redirectedUrl("/profile"));
         User updated = userRepository.findByEmail(owner.getEmail()).orElseThrow();
         assertThat(updated.getPasswordHash()).isNotEqualTo(NEW_PASSWORD).isNotEqualTo(originalHash);
         assertThat(passwordEncoder.matches(NEW_PASSWORD, updated.getPasswordHash())).isTrue();
@@ -169,7 +169,7 @@ class UserProfileIntegrationTests {
         String password = character.repeat(repetitions);
         mockMvc.perform(passwordRequest(OLD_PASSWORD, password))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/profile?success"));
+                .andExpect(redirectedUrl("/profile"));
         String hash = userRepository.findByEmail(owner.getEmail()).orElseThrow().getPasswordHash();
         assertThat(passwordEncoder.matches(password, hash)).isTrue();
     }
@@ -177,7 +177,7 @@ class UserProfileIntegrationTests {
     @Test
     void rejectsRepeatedUseOfOldPasswordAfterSuccessfulChange() throws Exception {
         mockMvc.perform(passwordRequest(OLD_PASSWORD, NEW_PASSWORD))
-                .andExpect(redirectedUrl("/profile?success"));
+                .andExpect(redirectedUrl("/profile"));
         mockMvc.perform(passwordRequest(OLD_PASSWORD, "another-new-test-password"))
                 .andExpect(status().isBadRequest())
                 .andExpect(model().attributeHasFieldErrors(PasswordChangeDTO.MODEL_ATTRIBUTE, "oldPassword"));

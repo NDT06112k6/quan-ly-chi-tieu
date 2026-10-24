@@ -13,9 +13,6 @@
                             <dt class="col-sm-4">Tên hiển thị</dt>
                             <dd class="col-sm-8 text-break" th:text="${profile.displayName}"></dd>
                         </dl>
-                        <p class="alert alert-success" role="status" th:if="${param.success != null}">
-                            Đổi mật khẩu thành công.
-                        </p>
                         <h2 class="h5 mb-3">Đổi mật khẩu</h2>
                         <form method="post" th:action="@{/profile/change-password}" th:object="${passwordChangeDTO}">
                             <div class="mb-3">

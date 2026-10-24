@@ -1,5 +1,6 @@
 package com.example.expensetracker.category;
 
+import com.example.expensetracker.common.util.FlashMessageUtil;
 import com.example.expensetracker.user.CurrentUserService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 @RequestMapping("/categories")
@@ -24,6 +26,7 @@ public class CategoryController {
     private static final String FORM_VIEW = "category/form";
     private static final String LIST_REDIRECT = "redirect:/categories";
     private static final String LIST_MODEL_ATTRIBUTE = "categories";
+    private static final String CREATE_SUCCESS_MESSAGE = "Thêm danh mục thành công!";
 
     private final CategoryService categoryService;
     private final CurrentUserService currentUserService;
@@ -62,13 +65,14 @@ public class CategoryController {
 
     @PostMapping
     public String createCategory(@Valid @ModelAttribute(CategoryDTO.MODEL_ATTRIBUTE) CategoryDTO dto,
-            BindingResult bindingResult, Authentication authentication) {
+            BindingResult bindingResult, RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
             return FORM_VIEW;
         }
 
-        Long userId = getCurrentUserId(authentication);
+        Long userId = currentUserService.getUserId();
         categoryService.createCategory(dto, userId);
+        FlashMessageUtil.addSuccess(redirectAttributes, CREATE_SUCCESS_MESSAGE);
         return LIST_REDIRECT;
     }
 

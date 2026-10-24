@@ -2,6 +2,8 @@ package com.example.expensetracker.budget;
 
 import com.example.expensetracker.category.CategoryOptionsDTO;
 import com.example.expensetracker.common.util.CategoryViewHelper;
+import com.example.expensetracker.common.util.FlashMessageUtil;
+import com.example.expensetracker.common.util.FormViewUtil;
 import com.example.expensetracker.user.CurrentUserService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -19,6 +21,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.YearMonth;
 import java.util.HashSet;
@@ -32,6 +36,7 @@ public class BudgetController {
     private static final String LIST_VIEW = "budget/list";
     private static final String FORM_VIEW = "budget/form";
     private static final String LIST_REDIRECT = "redirect:/budgets";
+    private static final String SAVE_SUCCESS_MESSAGE = "Lưu ngân sách thành công!";
 
     private final BudgetService budgetService;
     private final CategoryViewHelper categoryViewHelper;
@@ -73,16 +78,20 @@ public class BudgetController {
     }
 
     @PostMapping
-    public String setBudget(@Valid @ModelAttribute(BudgetDTO.MODEL_ATTRIBUTE) BudgetDTO dto,
-            BindingResult bindingResult, Model model) {
+    public ModelAndView setBudget(@Valid @ModelAttribute(BudgetDTO.MODEL_ATTRIBUTE) BudgetDTO dto,
+            BindingResult bindingResult, RedirectAttributes redirectAttributes) {
         Long userId = currentUserService.getUserId();
         if (bindingResult.hasErrors()) {
+            Model model = FormViewUtil.getBindingModel(bindingResult);
             categoryViewHelper.populateCategoryOptions(model, userId, dto.getCategoryId());
-            return FORM_VIEW;
+            ModelAndView response = new ModelAndView(FORM_VIEW, model.asMap());
+            return response;
         }
 
         budgetService.setBudget(dto, userId);
-        return LIST_REDIRECT;
+        FlashMessageUtil.addSuccess(redirectAttributes, SAVE_SUCCESS_MESSAGE);
+        ModelAndView response = new ModelAndView(LIST_REDIRECT);
+        return response;
     }
 
     @GetMapping("/categories")

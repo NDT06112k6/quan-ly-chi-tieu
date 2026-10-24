@@ -1,5 +1,6 @@
 package com.example.expensetracker.user;
 
+import com.example.expensetracker.common.util.FlashMessageUtil;
 import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 public class UserController {
@@ -21,7 +23,8 @@ public class UserController {
             "Email hoặc mật khẩu không đúng, hoặc tài khoản đã bị khóa.";
     private static final String REGISTER_URL = "/register";
     private static final String LOGIN_URL = "/login";
-    private static final String REGISTER_SUCCESS_REDIRECT = "redirect:/login?success";
+    private static final String REGISTER_SUCCESS_REDIRECT = "redirect:/login";
+    private static final String REGISTER_SUCCESS_MESSAGE = "Đăng ký thành công. Bạn có thể đăng nhập ngay.";
 
     private final UserService userService;
 
@@ -39,7 +42,7 @@ public class UserController {
     @PostMapping(REGISTER_URL)
     public String registerUser(
             @Valid @ModelAttribute(UserRegisterDTO.MODEL_ATTRIBUTE) UserRegisterDTO dto,
-            BindingResult bindingResult) {
+            BindingResult bindingResult, RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
             dto.clearPasswords();
             return REGISTER_VIEW;
@@ -47,6 +50,7 @@ public class UserController {
 
         userService.registerUser(dto);
         dto.clearPasswords();
+        FlashMessageUtil.addSuccess(redirectAttributes, REGISTER_SUCCESS_MESSAGE);
         return REGISTER_SUCCESS_REDIRECT;
     }
 
