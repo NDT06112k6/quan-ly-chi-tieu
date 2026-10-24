@@ -60,6 +60,7 @@
                             <th scope="col">Danh mục</th>
                             <th class="text-end" scope="col">Số tiền</th>
                             <th scope="col">Ghi chú</th>
+                            <th class="text-end" scope="col">Thao tác</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -70,6 +71,17 @@
                                 th:classappend="${categoryTypes[transaction.categoryId] == 'CHI' ? 'text-danger' : 'text-success'}"
                                 th:text="${transaction.amount.toPlainString()}"></td>
                             <td th:text="${transaction.note}"></td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"
+                                   th:href="@{/transactions/{id}(id=${transaction.id})}"
+                                   th:attr="aria-label=|Xem chi tiết giao dịch ${transaction.id}|">
+                                    <svg class="app-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                    Xem chi tiết
+                                </a>
+                            </td>
                         </tr>
                         </tbody>
                     </table>

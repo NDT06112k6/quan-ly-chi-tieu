@@ -1,17 +1,19 @@
 <th:block xmlns:th="http://www.thymeleaf.org"
-          th:replace="~{layout/main-layout :: layout('Thêm giao dịch', 'transactions', ~{::content})}">
+          th:replace="~{layout/main-layout :: layout(${editing == true ? 'Chỉnh sửa giao dịch' : 'Thêm giao dịch'}, 'transactions', ~{::content})}">
     <div th:fragment="content" class="page-content form-page">
         <div class="row justify-content-center">
             <div class="col-12">
                 <section class="card border-0 rounded-4 shadow-sm">
                     <div class="card-body p-4 p-md-5">
-                        <h1 class="h3 mb-3">Thêm giao dịch</h1>
+                        <h1 class="h3 mb-3" th:text="${editing == true ? 'Chỉnh sửa giao dịch' : 'Thêm giao dịch'}">Thêm giao dịch</h1>
                         <p class="page-description mb-4">Ghi lại một khoản thu hoặc chi để bức tranh tài chính luôn rõ
                             ràng.</p>
                         <p th:if="${#lists.isEmpty(categories)}">
                             Bạn cần <a th:href="@{/categories/new}">thêm danh mục</a> trước khi tạo giao dịch.
                         </p>
-                        <form method="post" th:action="@{/transactions}" th:object="${transactionDTO}">
+                        <form method="post"
+                              th:action="${editing == true} ? @{/transactions/{id}/edit(id=${transactionId})} : @{/transactions}"
+                              th:object="${transactionDTO}">
                             <div class="mb-3">
                                 <label class="form-label" for="amount">Số tiền</label>
                                 <input class="form-control" type="number" id="amount" th:field="*{amount}" min="0.01"
@@ -62,8 +64,11 @@
                                 giao dịch
                             </button>
                         </form>
-                        <p class="text-center text-body-secondary mt-4 mb-0"><a th:href="@{/transactions}">Quay lại danh
-                            sách</a></p>
+                        <p class="text-center text-body-secondary mt-4 mb-0">
+                            <a th:if="${editing == true}"
+                               th:href="@{/transactions/{id}(id=${transactionId})}">Quay lại chi tiết</a>
+                            <a th:unless="${editing == true}" th:href="@{/transactions}">Quay lại danh sách</a>
+                        </p>
                     </div>
                 </section>
             </div>

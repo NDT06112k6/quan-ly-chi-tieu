@@ -15,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -34,6 +35,8 @@ public class TransactionService {
     private static final String DATE_SORT_PROPERTY = "occurredOn";
     private static final String ID_SORT_PROPERTY = "id";
     private static final int MONEY_SCALE = 2;
+    private static final int EXPECTED_WRITE_COUNT = 1;
+    private static final String TRANSACTION_ACCESS_DENIED = "Không thể truy cập giao dịch này.";
     private static final String UTF8_BOM = "\uFEFF";
     private static final List<String> CSV_HEADER = List.of("Ngày", "Danh mục", "Số tiền", "Ghi chú");
 
@@ -47,12 +50,62 @@ public class TransactionService {
 
     @Transactional
     public void createTransaction(@Valid @NotNull TransactionDTO dto, @NotNull @Positive Long userId) {
-        Category category = categoryRepository.findByIdAndUserId(dto.getCategoryId(), userId)
-                .orElseThrow(InvalidTransactionCategoryException::new);
+        Category category = findOwnedCategory(dto.getCategoryId(), userId);
 
         Transaction transaction = new Transaction(
                 userId, category.getId(), dto.getAmount(), dto.getOccurredOn(), dto.getNote());
         transactionRepository.saveAndFlush(transaction);
+    }
+
+    public TransactionDetailDTO getTransactionDetail(@NotNull @Positive Long transactionId,
+            @NotNull @Positive Long userId) {
+        Transaction transaction = findOwnedTransaction(transactionId, userId);
+        Category category = findOwnedCategory(transaction.getCategoryId(), userId);
+        TransactionDetailDTO detail = new TransactionDetailDTO(
+                transaction.getId(), transaction.getAmount(), transaction.getOccurredOn(),
+                category.getName(), category.getType(), transaction.getNote());
+        return detail;
+    }
+
+    public TransactionDTO getTransactionForEdit(@NotNull @Positive Long transactionId,
+            @NotNull @Positive Long userId) {
+        Transaction transaction = findOwnedTransaction(transactionId, userId);
+        TransactionDTO dto = mapToDTO(transaction);
+        return dto;
+    }
+
+    @Transactional
+    public void updateTransaction(@NotNull @Positive Long transactionId, @Valid @NotNull TransactionDTO dto,
+            @NotNull @Positive Long userId) {
+        findOwnedTransaction(transactionId, userId);
+        Category category = findOwnedCategory(dto.getCategoryId(), userId);
+        int updatedRows = transactionRepository.updateByIdAndUserId(
+                transactionId, userId, category.getId(), dto.getAmount(), dto.getOccurredOn(), dto.getNote());
+        requireSuccessfulWrite(updatedRows);
+    }
+
+    @Transactional
+    public void deleteTransaction(@NotNull @Positive Long transactionId, @NotNull @Positive Long userId) {
+        int deletedRows = transactionRepository.deleteByIdAndUserId(transactionId, userId);
+        requireSuccessfulWrite(deletedRows);
+    }
+
+    private Transaction findOwnedTransaction(Long transactionId, Long userId) {
+        Transaction transaction = transactionRepository.findByIdAndUserId(transactionId, userId)
+                .orElseThrow(() -> new AccessDeniedException(TRANSACTION_ACCESS_DENIED));
+        return transaction;
+    }
+
+    private Category findOwnedCategory(Long categoryId, Long userId) {
+        Category category = categoryRepository.findByIdAndUserId(categoryId, userId)
+                .orElseThrow(InvalidTransactionCategoryException::new);
+        return category;
+    }
+
+    private void requireSuccessfulWrite(int affectedRows) {
+        if (affectedRows != EXPECTED_WRITE_COUNT) {
+            throw new AccessDeniedException(TRANSACTION_ACCESS_DENIED);
+        }
     }
 
     public Page<TransactionDTO> getTransactionsByUserId(@NotNull @Positive Long userId,

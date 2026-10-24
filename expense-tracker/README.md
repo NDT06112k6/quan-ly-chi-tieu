@@ -113,6 +113,32 @@ variables or cache settings change.
 
 ## Transactions
 
+Each transaction row includes an eye icon and a link to
+`GET /transactions/{id}`. The detail page uses the master layout and displays
+the exact `BigDecimal` amount, date, category name and escaped note. Amounts
+are red for category type `CHI` and green for `THU`; the type is also shown
+as text. The service reads the transaction with `findByIdAndUserId` and resolves
+the category with the same owner ID. Missing and foreign transactions both
+raise `AccessDeniedException` and render the shared HTTP 403 error page.
+The owner always comes from authentication; supplied ownership parameters
+cannot select a different account.
+
+The detail page links back to the list and to `GET /transactions/{id}/edit`,
+which reuses the transaction form. Edits submit to
+`POST /transactions/{id}/edit`; successful updates return to the detail page.
+Invalid forms return HTTP 400 with field errors and retain the edit action
+and selected category. The service checks transaction ownership, validates
+the owned category and calls the existing user-scoped update query. The
+transaction ID comes from the path and cannot be overwritten by form fields.
+
+Deletion submits a CSRF-protected form to `POST /transactions/{id}/delete`
+and returns to the list. GET requests never delete data. The delete query
+includes both transaction ID and authenticated user ID. Updates and deletes
+require exactly one affected row; missing, foreign or concurrently deleted
+transactions produce HTTP 403 instead of reporting success. No new dependencies,
+schema migrations, environment variables or cache resets are required. Refresh
+open transaction pages to load the detail links and reusable edit form.
+
 Authenticated users can list transactions at `GET /transactions?page=0`, open
 `GET /transactions/new`, and submit `POST /transactions`. Creation redirects
 to `/transactions`. The list contains DTOs, shows category names, and has 20
@@ -283,7 +309,7 @@ are required. Refresh open pages to load the new error template when an error oc
 
 ## Interface
 
-All eleven pages use the shared Thymeleaf fragment
+All pages use the shared Thymeleaf fragment
 `templates/layout/main-layout.html :: layout(pageTitle, activePage, content)`.
 Child templates contain only their content fragment and call the layout with
 `th:replace`; page-specific scripts stay with their content. Add global styles,

@@ -1,0 +1,40 @@
+<th:block xmlns:th="http://www.thymeleaf.org"
+          th:replace="~{layout/main-layout :: layout('Chi tiết giao dịch', 'transactions', ~{::content})}">
+    <div th:fragment="content" class="page-content form-page">
+        <section class="card border-0 rounded-4 shadow-sm" aria-labelledby="transaction-detail-title">
+            <div class="card-body p-4 p-md-5">
+                <p class="page-eyebrow mb-2">THÔNG TIN GIAO DỊCH</p>
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+                    <h1 class="h3 mb-0" id="transaction-detail-title">Chi tiết giao dịch</h1>
+                    <span class="badge rounded-pill"
+                          th:classappend="${transaction.expense ? 'text-bg-danger' : 'text-bg-success'}"
+                          th:text="${transaction.expense ? 'Chi tiêu (CHI)' : 'Thu nhập (THU)'}"></span>
+                </div>
+                <div class="border rounded-4 p-4 mb-4 bg-body-tertiary">
+                    <h2 class="h6 text-body-secondary mb-3">Số tiền</h2>
+                    <p class="fs-2 fw-bold text-break mb-0" id="transaction-amount"
+                       th:classappend="${transaction.expense ? 'text-danger' : 'text-success'}"
+                       th:text="${transaction.amount.toPlainString()}"></p>
+                </div>
+                <dl class="row gy-3 mb-4">
+                    <dt class="col-sm-4 text-body-secondary">Ngày giao dịch</dt>
+                    <dd class="col-sm-8" th:text="${transaction.occurredOn}"></dd>
+                    <dt class="col-sm-4 text-body-secondary">Tên danh mục</dt>
+                    <dd class="col-sm-8 text-break" th:text="${transaction.categoryName}"></dd>
+                    <dt class="col-sm-4 text-body-secondary">Ghi chú</dt>
+                    <dd class="col-sm-8 text-break transaction-note"
+                        th:text="${#strings.isEmpty(transaction.note) ? 'Không có ghi chú.' : transaction.note}"></dd>
+                </dl>
+                <div class="d-flex flex-wrap justify-content-between gap-3 border-top pt-4">
+                    <a class="btn btn-outline-secondary" th:href="@{/transactions}">Quay lại</a>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-primary" th:href="@{/transactions/{id}/edit(id=${transaction.id})}">Chỉnh sửa</a>
+                        <form method="post" th:action="@{/transactions/{id}/delete(id=${transaction.id})}">
+                            <button class="btn btn-outline-danger" type="submit">Xóa</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</th:block>

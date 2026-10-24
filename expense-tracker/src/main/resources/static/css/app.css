@@ -383,6 +383,10 @@ h1 {
     max-width: 380px;
 }
 
+.transaction-note {
+    white-space: pre-wrap;
+}
+
 .is-guest {
     background: radial-gradient(ellipse at top left, #e1eee3, transparent 65%), var(--app-canvas);
 }
