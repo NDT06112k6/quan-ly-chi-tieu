@@ -1,8 +1,11 @@
 package com.example.expensetracker.transaction;
 
+import com.example.expensetracker.category.Category;
 import com.example.expensetracker.category.CategoryRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -13,11 +16,14 @@ import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionServiceTests {
@@ -28,30 +34,62 @@ class TransactionServiceTests {
     @Mock
     private CategoryRepository categoryRepository;
 
+    @Mock
+    private Category category;
+
+    @InjectMocks
+    private TransactionService transactionService;
+
+    @Test
+    void testCreateTransaction_Success() {
+        Long userId = 42L;
+        Long categoryId = 7L;
+        TransactionDTO dto = createTransactionDTO(categoryId);
+        when(categoryRepository.findByIdAndUserId(categoryId, userId)).thenReturn(Optional.of(category));
+        when(category.getId()).thenReturn(categoryId);
+
+        transactionService.createTransaction(dto, userId);
+
+        ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
+        verify(transactionRepository, times(1)).saveAndFlush(transactionCaptor.capture());
+        Transaction savedTransaction = transactionCaptor.getValue();
+        assertEquals(userId, savedTransaction.getUserId());
+        assertEquals(categoryId, savedTransaction.getCategoryId());
+        assertEquals(dto.getAmount(), savedTransaction.getAmount());
+        assertEquals(dto.getOccurredOn(), savedTransaction.getOccurredOn());
+        assertEquals(dto.getNote(), savedTransaction.getNote());
+        verify(categoryRepository).findByIdAndUserId(categoryId, userId);
+    }
+
     @Test
     void preservesExportDatabaseFailureRatherThanReturningHeaderOnlySuccess() {
         Long userId = 42L;
         DataAccessResourceFailureException failure = new DataAccessResourceFailureException("Test database failure");
         when(transactionRepository.findExportRowsByUserId(eq(userId), any(Pageable.class))).thenThrow(failure);
-        TransactionService transactionService = new TransactionService(transactionRepository, categoryRepository);
         assertThatThrownBy(() -> transactionService.exportTransactionsCsv(userId)).isSameAs(failure);
     }
 
     @Test
-    void stopsBeforePersistenceWhenCategoryOwnershipCheckFails() {
+    void testCreateTransaction_CategoryNotFound() {
         Long userId = 42L;
         Long categoryId = 7L;
-        TransactionDTO dto = new TransactionDTO();
-        dto.setAmount(new BigDecimal("12.34"));
-        dto.setOccurredOn(LocalDate.of(2026, 10, 23));
-        dto.setCategoryId(categoryId);
+        TransactionDTO dto = createTransactionDTO(categoryId);
         when(categoryRepository.findByIdAndUserId(categoryId, userId)).thenReturn(Optional.empty());
-        TransactionService transactionService = new TransactionService(transactionRepository, categoryRepository);
 
-        assertThatThrownBy(() -> transactionService.createTransaction(dto, userId))
-                .isInstanceOf(InvalidTransactionCategoryException.class);
+        assertThrows(InvalidTransactionCategoryException.class, () -> {
+            transactionService.createTransaction(dto, userId);
+        });
 
         verify(categoryRepository).findByIdAndUserId(categoryId, userId);
         verifyNoInteractions(transactionRepository);
+    }
+
+    private TransactionDTO createTransactionDTO(Long categoryId) {
+        TransactionDTO dto = new TransactionDTO();
+        dto.setAmount(new BigDecimal("12.34"));
+        dto.setOccurredOn(LocalDate.of(2026, 10, 23));
+        dto.setNote("Lunch");
+        dto.setCategoryId(categoryId);
+        return dto;
     }
 }
