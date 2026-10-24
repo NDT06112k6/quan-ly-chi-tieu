@@ -1,32 +1,21 @@
-<!DOCTYPE html>
-<html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Đã xảy ra lỗi | Expense Tracker</title>
-    <link rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
-          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
-          crossorigin="anonymous">
-</head>
-<body class="bg-body-tertiary">
-<main class="container min-vh-100 d-flex align-items-center justify-content-center py-5">
-    <div class="row justify-content-center w-100">
-        <div class="col-12 col-md-8 col-lg-6">
-            <section class="card border-0 rounded-4 shadow-sm text-center">
-                <div class="card-body p-4 p-md-5">
-                    <h1 class="h3 mb-3">Đã xảy ra lỗi</h1>
-                    <p class="text-body-secondary mb-4" role="alert" th:text="${error.message}">
-                        Đã xảy ra lỗi, vui lòng thử lại.
-                    </p>
-                    <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
-                        <a class="btn btn-primary" th:href="@{/}">Quay lại trang chủ</a>
-                        <a class="btn btn-outline-secondary" th:href="@{/login}">Đăng nhập</a>
+<th:block xmlns:th="http://www.thymeleaf.org"
+          th:replace="~{layout/main-layout :: layout('Đã xảy ra lỗi', 'error', ~{::content})}">
+    <div th:fragment="content" class="page-content auth-content">
+        <div class="row justify-content-center">
+            <div class="col-12">
+                <section class="card border-0 rounded-4 shadow-sm text-center">
+                    <div class="card-body p-4 p-md-5">
+                        <h1 class="h3 mb-3">Đã xảy ra lỗi</h1>
+                        <p class="text-body-secondary mb-4" role="alert" th:text="${error.message}">
+                            Đã xảy ra lỗi, vui lòng thử lại.
+                        </p>
+                        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+                            <a class="btn btn-primary" th:href="@{/}">Quay lại trang chủ</a>
+                            <a class="btn btn-outline-secondary" th:href="@{/login}">Đăng nhập</a>
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
+            </div>
         </div>
     </div>
-</main>
-</body>
-</html>
+</th:block>

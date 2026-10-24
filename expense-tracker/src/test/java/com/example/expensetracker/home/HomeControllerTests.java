@@ -3,6 +3,7 @@ package com.example.expensetracker.home;
 import com.example.expensetracker.config.SecurityConfig;
 import com.example.expensetracker.transaction.TransactionService;
 import com.example.expensetracker.user.CurrentUserService;
+import com.example.expensetracker.user.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -30,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(HomeController.class)
 @Import(SecurityConfig.class)
-@MockitoBean(types = {UserDetailsService.class, TransactionService.class, CurrentUserService.class})
+@MockitoBean(types = {UserDetailsService.class, TransactionService.class, CurrentUserService.class, UserService.class})
 class HomeControllerTests {
 
     private final MockMvc mockMvc;

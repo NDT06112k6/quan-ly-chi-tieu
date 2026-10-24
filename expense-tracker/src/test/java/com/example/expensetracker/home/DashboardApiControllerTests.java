@@ -3,6 +3,7 @@ package com.example.expensetracker.home;
 import com.example.expensetracker.config.SecurityConfig;
 import com.example.expensetracker.transaction.TransactionService;
 import com.example.expensetracker.user.CurrentUserService;
+import com.example.expensetracker.user.UserService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -30,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(DashboardApiController.class)
 @Import(SecurityConfig.class)
-@MockitoBean(types = {TransactionService.class, CurrentUserService.class, UserDetailsService.class})
+@MockitoBean(types = {TransactionService.class, CurrentUserService.class, UserDetailsService.class, UserService.class})
 class DashboardApiControllerTests {
 
     private final MockMvc mockMvc;

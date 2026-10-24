@@ -3,6 +3,7 @@ package com.example.expensetracker.config;
 import com.example.expensetracker.user.CustomUserDetailsService;
 import com.example.expensetracker.user.User;
 import com.example.expensetracker.user.UserRepository;
+import com.example.expensetracker.user.UserService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -35,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(SecurityConfigTests.TestController.class)
 @Import({SecurityConfig.class, CustomUserDetailsService.class, SecurityConfigTests.TestController.class})
-@MockitoBean(types = UserRepository.class)
+@MockitoBean(types = {UserRepository.class, UserService.class})
 class SecurityConfigTests {
 
     private static final String EMAIL = "security-test@example.invalid";

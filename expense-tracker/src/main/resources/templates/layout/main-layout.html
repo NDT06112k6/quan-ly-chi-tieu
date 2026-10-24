@@ -1,0 +1,175 @@
+<th:block xmlns:th="http://www.thymeleaf.org"
+          xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+          th:fragment="layout(pageTitle, activePage, content)">
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#153e38">
+        <title th:text="|${pageTitle} · Expense Tracker|">Expense Tracker</title>
+        <link rel="stylesheet"
+              href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+              integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+              crossorigin="anonymous">
+        <link rel="stylesheet" th:href="@{/css/app.css}">
+        <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+                integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+                crossorigin="anonymous"></script>
+    </head>
+    <body th:class="${#authorization.expression('isAuthenticated()') ? 'is-signed-in' : 'is-guest'}">
+    <a class="visually-hidden-focusable skip-link" href="#main-content">Đi đến nội dung chính</a>
+    <svg class="d-none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <symbol id="icon-wallet" viewBox="0 0 24 24">
+            <path d="M20 7H5a2 2 0 0 1 0-4h13v4M4 5v14a2 2 0 0 0 2 2h14V7M20 11h-5v6h5M17 14h.01"/>
+        </symbol>
+        <symbol id="icon-dashboard" viewBox="0 0 24 24">
+            <path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/>
+        </symbol>
+        <symbol id="icon-transactions" viewBox="0 0 24 24">
+            <path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/>
+        </symbol>
+        <symbol id="icon-categories" viewBox="0 0 24 24">
+            <path d="m3 12 9 9 9-9V3h-9z"/>
+            <circle cx="16" cy="8" r="1"/>
+        </symbol>
+        <symbol id="icon-budgets" viewBox="0 0 24 24">
+            <path d="M12 3v9h9M21 15a9 9 0 1 1-12-12M15 3a9 9 0 0 1 6 6h-6z"/>
+        </symbol>
+        <symbol id="icon-user" viewBox="0 0 24 24">
+            <circle cx="12" cy="8" r="4"/>
+            <path d="M4 21v-2a8 8 0 0 1 16 0v2"/>
+        </symbol>
+        <symbol id="icon-logout" viewBox="0 0 24 24">
+            <path d="M9 4H4v16h5M10 12h11m-4-4 4 4-4 4"/>
+        </symbol>
+        <symbol id="icon-menu" viewBox="0 0 24 24">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+        </symbol>
+    </svg>
+
+    <aside class="app-sidebar offcanvas-lg offcanvas-start border-0" id="app-sidebar"
+           tabindex="-1" aria-labelledby="sidebar-title" sec:authorize="isAuthenticated()">
+        <div class="offcanvas-header d-lg-none">
+            <span class="fw-semibold text-white" id="sidebar-title">Điều hướng</span>
+            <button class="btn-close btn-close-white" type="button" data-bs-dismiss="offcanvas"
+                    data-bs-target="#app-sidebar" aria-label="Đóng menu"></button>
+        </div>
+        <div class="offcanvas-body d-flex flex-column p-4">
+            <a class="app-brand d-flex align-items-center gap-3 text-decoration-none" th:href="@{/}">
+            <span class="brand-mark">
+                <svg class="app-icon" aria-hidden="true"><use href="#icon-wallet"/></svg>
+            </span>
+                <span><span class="d-block fw-bold">Expense Tracker</span><small>Tài chính trong tầm tay</small></span>
+            </a>
+            <div class="sidebar-account d-flex align-items-center gap-3 my-4 p-3">
+            <span class="user-avatar flex-shrink-0">
+                <svg class="app-icon" aria-hidden="true"><use href="#icon-user"/></svg>
+            </span>
+                <div class="overflow-hidden">
+                    <small class="d-block">Xin chào,</small>
+                    <span class="d-block fw-semibold text-break" data-testid="sidebar-user"
+                          th:text="${profile != null ? profile.displayName : (layoutProfile != null ? layoutProfile.displayName : #authentication.name)}"></span>
+                </div>
+            </div>
+            <p class="sidebar-label mb-3">KHÔNG GIAN CÁ NHÂN</p>
+            <nav class="nav nav-pills flex-column gap-2" aria-label="Điều hướng chính">
+                <a class="nav-link d-flex align-items-center gap-3" th:href="@{/}"
+                   th:classappend="${activePage == 'dashboard' ? 'active' : ''}"
+                   th:attr="aria-current=${activePage == 'dashboard' ? 'page' : null}">
+                    <svg class="app-icon" aria-hidden="true">
+                        <use href="#icon-dashboard"/>
+                    </svg>
+                    Tổng quan
+                </a>
+                <a class="nav-link d-flex align-items-center gap-3" th:href="@{/transactions}"
+                   th:classappend="${activePage == 'transactions' ? 'active' : ''}"
+                   th:attr="aria-current=${activePage == 'transactions' ? 'page' : null}">
+                    <svg class="app-icon" aria-hidden="true">
+                        <use href="#icon-transactions"/>
+                    </svg>
+                    Giao dịch
+                </a>
+                <a class="nav-link d-flex align-items-center gap-3" th:href="@{/categories}"
+                   th:classappend="${activePage == 'categories' ? 'active' : ''}"
+                   th:attr="aria-current=${activePage == 'categories' ? 'page' : null}">
+                    <svg class="app-icon" aria-hidden="true">
+                        <use href="#icon-categories"/>
+                    </svg>
+                    Danh mục
+                </a>
+                <a class="nav-link d-flex align-items-center gap-3" th:href="@{/budgets}"
+                   th:classappend="${activePage == 'budgets' ? 'active' : ''}"
+                   th:attr="aria-current=${activePage == 'budgets' ? 'page' : null}">
+                    <svg class="app-icon" aria-hidden="true">
+                        <use href="#icon-budgets"/>
+                    </svg>
+                    Ngân sách
+                </a>
+                <a class="nav-link d-flex align-items-center gap-3" th:href="@{/profile}"
+                   th:classappend="${activePage == 'profile' ? 'active' : ''}"
+                   th:attr="aria-current=${activePage == 'profile' ? 'page' : null}">
+                    <svg class="app-icon" aria-hidden="true">
+                        <use href="#icon-user"/>
+                    </svg>
+                    Hồ sơ
+                </a>
+            </nav>
+            <div class="sidebar-footer mt-auto pt-4">
+                <div class="sidebar-note d-none d-lg-block p-3 mb-4">
+                    <p class="fw-semibold mb-1">Từng khoản nhỏ, mục tiêu lớn.</p>
+                    <small>Theo dõi hôm nay để chủ động hơn ngày mai.</small>
+                </div>
+                <form method="post" th:action="@{/logout}">
+                    <button class="btn sidebar-logout d-flex align-items-center gap-3 w-100" type="submit">
+                        <svg class="app-icon" aria-hidden="true">
+                            <use href="#icon-logout"/>
+                        </svg>
+                        Đăng xuất
+                    </button>
+                </form>
+            </div>
+        </div>
+    </aside>
+
+    <div class="app-main">
+        <header class="app-topbar d-flex align-items-center justify-content-between gap-3 px-3 px-md-4 px-xl-5 py-3"
+                sec:authorize="isAuthenticated()">
+            <div class="d-flex align-items-center gap-3">
+                <button class="btn btn-outline-secondary d-lg-none p-2" type="button"
+                        data-bs-toggle="offcanvas" data-bs-target="#app-sidebar" aria-controls="app-sidebar"
+                        aria-label="Mở menu điều hướng">
+                    <svg class="app-icon" aria-hidden="true">
+                        <use href="#icon-menu"/>
+                    </svg>
+                </button>
+                <div>
+                    <small class="text-body-secondary d-none d-sm-block">Quản lý chi tiêu cá nhân</small>
+                    <span class="fw-semibold" th:text="${pageTitle}"></span>
+                </div>
+            </div>
+            <a class="topbar-profile d-flex align-items-center gap-2 text-decoration-none" th:href="@{/profile}">
+            <span class="user-avatar">
+                <svg class="app-icon" aria-hidden="true"><use href="#icon-user"/></svg>
+            </span>
+                <span class="d-none d-sm-inline">Hồ sơ của tôi</span>
+            </a>
+        </header>
+        <header class="guest-header px-4 py-4" sec:authorize="isAnonymous()">
+            <a class="app-brand d-inline-flex align-items-center gap-3 text-decoration-none" th:href="@{/login}">
+            <span class="brand-mark">
+                <svg class="app-icon" aria-hidden="true"><use href="#icon-wallet"/></svg>
+            </span>
+                <span class="fw-bold">Expense Tracker</span>
+            </a>
+        </header>
+        <main class="app-content container-fluid px-3 px-md-4 px-xl-5 py-4 py-xl-5" id="main-content" tabindex="-1">
+            <th:block th:replace="${content}"></th:block>
+        </main>
+        <footer class="app-footer px-4 pb-4 text-center text-body-secondary">
+            <small>Expense Tracker · Chủ động chi tiêu, vững vàng kế hoạch.</small>
+        </footer>
+    </div>
+    </body>
+    </html>
+</th:block>

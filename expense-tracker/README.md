@@ -226,8 +226,9 @@ No Maven dependencies or environment variables are added; Hibernate stays in
 `GET /` displays total income, total expense and balance for the authenticated
 user's current calendar month, plus a link to create a transaction. The month
 and year come from `LocalDate.now()` in the application's JVM timezone. Request
-parameters cannot override the report period or owner. The model contains only
-`DashboardDTO` monetary values, the month and the year.
+parameters cannot override the report period or owner. The dashboard model
+contains `DashboardDTO` monetary values, the month and the year; the shared
+layout also receives the authenticated user's profile DTO.
 
 The repository aggregates `THU` and `CHI` separately by transaction date,
 filtering both transactions and joined categories by the same user ID. A month
@@ -282,13 +283,31 @@ are required. Refresh open pages to load the new error template when an error oc
 
 ## Interface
 
-All eleven Thymeleaf pages use Bootstrap 5.3.8 CSS through jsDelivr, pinned with
-the integrity hash from the [official Bootstrap documentation](https://getbootstrap.com/docs/5.3/getting-started/introduction/).
-Login and registration use centered responsive cards. Forms, buttons, validation
-feedback, bordered tables and pagination use Bootstrap classes. The old local
-`auth.css` and `category.css` stylesheets have been removed; browsers need access
-to the CDN to load the styles. Refresh open pages to load the updated templates.
-The interface adds no Maven dependencies, environment variables or server cache settings.
+All eleven pages use the shared Thymeleaf fragment
+`templates/layout/main-layout.html :: layout(pageTitle, activePage, content)`.
+Child templates contain only their content fragment and call the layout with
+`th:replace`; page-specific scripts stay with their content. Add global styles,
+scripts and navigation in the layout rather than duplicating document markup.
+The active page keys are `dashboard`, `transactions`, `categories`, `budgets`
+and `profile`; forms keep their feature's navigation item active.
+
+The authenticated layout has a fixed left sidebar on desktop, a Bootstrap
+offcanvas menu below 992px, and a content area on the right. The sidebar contains
+the logo, display name, five navigation links and the CSRF-protected POST logout
+form at the bottom. `LayoutModelAdvice` resolves the profile through `UserService`
+using the authenticated principal; the profile page uses its existing profile
+DTO. Anonymous requests do not perform a profile lookup. Profile lookup failures
+remain failures. Login, registration and errors share the document resources;
+anonymous visitors see a centered card without authenticated navigation.
+
+Bootstrap 5.3.8 CSS and its JavaScript bundle load through jsDelivr with integrity
+hashes. The bundle powers the mobile menu. Local `/css/app.css` supplies the shared
+green palette, spacing, forms, tables, dashboard cards and responsive rules.
+The interface includes a keyboard skip link, visible focus states, accessible
+menu controls and reduced-motion support. Browsers need CDN access for Bootstrap
+and Chart.js. Refresh open pages to load the updated templates and stylesheet;
+there are no new Maven dependencies, environment variables, schema changes or
+server cache settings.
 
 Transaction amounts remain positive `BigDecimal` values. The list colors them
 red for `CHI` and green for `THU` using the actual category type from the same

@@ -1,82 +1,96 @@
-<!DOCTYPE html>
-<html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Báo cáo tổng quan | Expense Tracker</title>
-    <link rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
-          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
-          crossorigin="anonymous">
-    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
-    <script defer th:src="@{/js/dashboard-chart.js}"></script>
-</head>
-<body class="bg-body-tertiary">
-<main class="container py-4 py-md-5">
-    <header class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-        <div>
-            <h1 class="h3 mb-2">Chào mừng đến với Expense Tracker</h1>
-            <p class="text-body-secondary mb-0"
-               th:text="|Báo cáo tổng quan tháng ${currentMonth}/${currentYear}|"></p>
-        </div>
-        <form method="post" th:action="@{/logout}">
-            <button class="btn btn-outline-danger px-4" type="submit">Đăng xuất</button>
-        </form>
-    </header>
-    <section class="row g-4" aria-label="Báo cáo tổng quan tháng hiện tại">
-        <div class="col-12 col-md-4">
-            <article class="card border-success h-100 shadow-sm">
-                <div class="card-body p-4">
-                    <h2 class="h6 text-body-secondary mb-3">Tổng thu</h2>
-                    <p class="fs-2 fw-semibold text-success text-break mb-0" id="total-income"
-                       th:text="${dashboard.totalIncome.toPlainString()}"></p>
-                </div>
-            </article>
-        </div>
-        <div class="col-12 col-md-4">
-            <article class="card border-danger h-100 shadow-sm">
-                <div class="card-body p-4">
-                    <h2 class="h6 text-body-secondary mb-3">Tổng chi</h2>
-                    <p class="fs-2 fw-semibold text-danger text-break mb-0" id="total-expense"
-                       th:text="${dashboard.totalExpense.toPlainString()}"></p>
-                </div>
-            </article>
-        </div>
-        <div class="col-12 col-md-4">
-            <article class="card border-primary h-100 shadow-sm">
-                <div class="card-body p-4">
-                    <h2 class="h6 text-body-secondary mb-3">Số dư</h2>
-                    <p class="fs-2 fw-semibold text-break mb-0" id="balance"
-                       th:classappend="${dashboard.balance.signum() < 0 ? 'text-danger' : 'text-primary'}"
-                       th:text="${dashboard.balance.toPlainString()}"></p>
-                </div>
-            </article>
-        </div>
-    </section>
-    <section class="card border-0 shadow-sm mt-4" aria-labelledby="expense-chart-title">
-        <div class="card-body p-4">
-            <h2 class="h5 mb-3" id="expense-chart-title">Tỷ lệ chi tiêu theo danh mục</h2>
-            <p class="text-body-secondary" th:text="|Chi tiêu tháng ${currentMonth}/${currentYear}|"></p>
-            <p id="expense-chart-status" role="status" aria-live="polite">Đang tải biểu đồ...</p>
-            <div class="row justify-content-center">
-                <div class="col-12 col-md-8 col-lg-6">
-                    <div class="ratio ratio-1x1" id="expense-chart-container" hidden>
-                        <canvas id="expense-chart" role="img"
-                                aria-label="Biểu đồ tròn tỷ lệ chi tiêu theo danh mục của tháng hiện tại">
-                            Biểu đồ chi tiêu cần trình duyệt hỗ trợ canvas.
-                        </canvas>
-                    </div>
-                </div>
+<th:block xmlns:th="http://www.thymeleaf.org"
+          th:replace="~{layout/main-layout :: layout('Tổng quan', 'dashboard', ~{::content})}">
+    <div th:fragment="content" class="page-content">
+        <header class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+            <div>
+                <p class="page-eyebrow mb-2">BỨC TRANH TÀI CHÍNH CỦA BẠN</p>
+                <h1 class="h3 mb-2">Chào mừng đến với Expense Tracker</h1>
+                <p class="page-description mb-0"
+                   th:text="|Báo cáo tổng quan tháng ${currentMonth}/${currentYear}|"></p>
             </div>
-            <button class="btn btn-outline-primary" type="button" id="expense-chart-retry" hidden>Thử lại</button>
-            <noscript>Bật JavaScript để xem biểu đồ chi tiêu.</noscript>
+            <a class="btn btn-primary" th:href="@{/transactions/new}">+ Thêm giao dịch ngay</a>
+        </header>
+        <section class="row g-3 g-xl-4" aria-label="Báo cáo tổng quan tháng hiện tại">
+            <div class="col-12 col-md-4">
+                <article class="card summary-card h-100">
+                    <div class="card-body p-4">
+                        <span class="summary-symbol text-success" aria-hidden="true">↙</span>
+                        <h2 class="h6 text-body-secondary mb-3">Tổng thu</h2>
+                        <p class="fs-2 fw-semibold text-success text-break mb-2" id="total-income"
+                           th:text="${dashboard.totalIncome.toPlainString()}"></p>
+                        <p class="summary-caption mb-0">Thu nhập trong tháng</p>
+                    </div>
+                </article>
+            </div>
+            <div class="col-12 col-md-4">
+                <article class="card summary-card h-100">
+                    <div class="card-body p-4">
+                        <span class="summary-symbol text-danger" aria-hidden="true">↗</span>
+                        <h2 class="h6 text-body-secondary mb-3">Tổng chi</h2>
+                        <p class="fs-2 fw-semibold text-danger text-break mb-2" id="total-expense"
+                           th:text="${dashboard.totalExpense.toPlainString()}"></p>
+                        <p class="summary-caption mb-0">Chi tiêu trong tháng</p>
+                    </div>
+                </article>
+            </div>
+            <div class="col-12 col-md-4">
+                <article class="card summary-card balance-card h-100">
+                    <div class="card-body p-4">
+                        <span class="summary-symbol" aria-hidden="true">=</span>
+                        <h2 class="h6 mb-3">Số dư</h2>
+                        <p class="fs-2 fw-semibold text-break mb-2" id="balance"
+                           th:classappend="${dashboard.balance.signum() < 0 ? 'text-danger' : 'text-primary'}"
+                           th:text="${dashboard.balance.toPlainString()}"></p>
+                        <p class="summary-caption mb-0">Tổng thu trừ tổng chi</p>
+                    </div>
+                </article>
+            </div>
+        </section>
+        <div class="row g-4 mt-1">
+            <div class="col-12 col-xl-8">
+                <section class="card border-0 shadow-sm h-100" aria-labelledby="expense-chart-title">
+                    <div class="card-body p-4">
+                        <p class="page-eyebrow mb-2">CHI TIÊU TRONG THÁNG</p>
+                        <h2 class="h5 mb-2" id="expense-chart-title">Tỷ lệ chi tiêu theo danh mục</h2>
+                        <p class="text-body-secondary small"
+                           th:text="|Chi tiêu tháng ${currentMonth}/${currentYear}|"></p>
+                        <p id="expense-chart-status" role="status" aria-live="polite">Đang tải biểu đồ...</p>
+                        <div class="mx-auto chart-frame">
+                            <div class="ratio ratio-1x1" id="expense-chart-container" hidden>
+                                <canvas id="expense-chart" role="img"
+                                        aria-label="Biểu đồ tròn tỷ lệ chi tiêu theo danh mục của tháng hiện tại">
+                                    Biểu đồ chi tiêu cần trình duyệt hỗ trợ canvas.
+                                </canvas>
+                            </div>
+                        </div>
+                        <button class="btn btn-outline-primary" type="button" id="expense-chart-retry" hidden>Thử lại
+                        </button>
+                        <noscript>Bật JavaScript để xem biểu đồ chi tiêu.</noscript>
+                    </div>
+                </section>
+            </div>
+            <div class="col-12 col-xl-4">
+                <section class="card border-0 shadow-sm h-100" aria-labelledby="quick-actions-title">
+                    <div class="card-body p-4">
+                        <p class="page-eyebrow mb-2">THAO TÁC NHANH</p>
+                        <h2 class="h5 mb-3" id="quick-actions-title">Kế hoạch bắt đầu từ đây</h2>
+                        <p class="page-description mb-4">Ghi lại giao dịch, sắp xếp danh mục và dành ngân sách cho điều
+                            bạn ưu tiên.</p>
+                        <div class="dashboard-shortcuts d-grid gap-3">
+                            <a class="btn btn-outline-primary" th:href="@{/transactions}">Xem giao dịch <span
+                                    aria-hidden="true">↗</span></a>
+                            <a class="btn btn-outline-primary" th:href="@{/budgets}">Quản lý ngân sách <span
+                                    aria-hidden="true">↗</span></a>
+                            <a class="btn btn-outline-secondary" th:href="@{/categories}">Sắp xếp danh mục <span
+                                    aria-hidden="true">↗</span></a>
+                            <a class="btn btn-outline-secondary" th:href="@{/profile}">Tài khoản của tôi <span
+                                    aria-hidden="true">↗</span></a>
+                        </div>
+                    </div>
+                </section>
+            </div>
         </div>
-    </section>
-    <div class="d-grid d-sm-flex flex-wrap gap-2 mt-4">
-        <a class="btn btn-primary btn-lg" th:href="@{/transactions/new}">Thêm giao dịch ngay</a>
-        <a class="btn btn-outline-primary btn-lg" th:href="@{/budgets}">Quản lý ngân sách</a>
-        <a class="btn btn-outline-secondary btn-lg" th:href="@{/profile}">Tài khoản của tôi</a>
+        <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+        <script defer th:src="@{/js/dashboard-chart.js}"></script>
     </div>
-</main>
-</body>
-</html>
+</th:block>

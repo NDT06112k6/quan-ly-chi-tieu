@@ -62,3 +62,28 @@
 - **Comment (Bình luận):** Code phải tự giải thích ý nghĩa của nó. Comment chỉ dùng để giải thích **"Tại sao" (Why)** làm như vậy (ví dụ: tại sao phải dùng thuật toán này), không comment giải thích **"Cái gì" (What)**.
 - **Xóa code rác:** Không để lại các đoạn code đã comment out (ví dụ: `// int a = 5;`) hay các biến/hàm không dùng đến trong dự án.
 - **Nguyên tắc DRY (Don't Repeat Yourself):** Nếu thấy một đoạn logic bị lặp lại từ 2 lần trở lên ở các class khác nhau, phải tách nó ra thành hàm dùng chung (trong thư mục `common/util`).
+
+## 10. Quy chuẩn Viết Test (Testing Standards)
+- **Phân tầng Test:**
+  - Tầng Repository: Dùng `@DataJpaTest` (chạy với H2 Database in-memory, không dùng MySQL thật).
+  - Tầng Service: Dùng JUnit 5 + Mockito (`@ExtendWith(MockitoExtension.class)`), không khởi động Spring Context.
+  - Tầng Controller: Dùng `@WebMvcTest` kết hợp `MockMvc`.
+- **Độ bao phủ (Coverage):** Ưu tiên test các luồng nghiệp vụ phức tạp (Happy Case và Exception Case). Bắt buộc phải có test cho logic kiểm tra quyền sở hữu (`user_id`).
+
+## 11. Quy chuẩn Ghi Log (Logging)
+- Tuyệt đối **KHÔNG** dùng `System.out.println()`.
+- Sử dụng `@Slf4j` (Lombok) hoặc `LoggerFactory.getLogger()` để ghi log.
+- Phân cấp độ log rõ ràng:
+  - `log.info()`: Cho các sự kiện bình thường (VD: User đăng ký thành công).
+  - `log.warn()`: Cho các lỗi nghiệp vụ có thể đoán trước (VD: Nhập sai mật khẩu, vượt ngân sách).
+  - `log.error()`: Cho các lỗi hệ thống (Exception, mất kết nối DB). Khi dùng `log.error`, phải truyền kèm đối tượng `Exception` để in ra StackTrace.
+- Không bao giờ log dữ liệu nhạy cảm (Mật khẩu, số thẻ, token).
+
+## 12. Quy chuẩn Git Commit (Git Convention)
+- Tuân thủ chuẩn Conventional Commits:
+  - `feat: ...` (Tính năng mới)
+  - `fix: ...` (Sửa lỗi)
+  - `test: ...` (Viết hoặc sửa test)
+  - `refactor: ...` (Viết lại code cho sạch hơn, không đổi tính năng)
+  - `chore: ...` (Cập nhật cấu hình, pom.xml, gitignore)
+- Mỗi commit chỉ nên giải quyết MỘT vấn đề. Không commit khi code đang lỗi compile.

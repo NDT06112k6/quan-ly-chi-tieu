@@ -1,100 +1,96 @@
-<!DOCTYPE html>
-<html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Giao dịch | Expense Tracker</title>
-    <link rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
-          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
-          crossorigin="anonymous">
-    <script defer th:src="@{/js/category-options.js}"></script>
-</head>
-<body class="bg-body-tertiary">
-<main class="container py-4 py-md-5">
-    <section class="card border-0 rounded-4 shadow-sm">
-        <div class="card-body p-4 p-md-5">
-            <h1 class="h3 mb-4">Giao dịch của tôi</h1>
-            <nav class="d-flex flex-wrap align-items-center justify-content-between gap-3 my-4"
-                 aria-label="Điều hướng giao dịch">
-                <a class="btn btn-primary" th:href="@{/transactions/new}">Thêm giao dịch</a>
-                <a class="btn btn-outline-success" th:href="@{/transactions/export}">Xuất tất cả CSV</a>
-                <a class="btn btn-outline-secondary" th:href="@{/}">Quay lại trang chủ</a>
-            </nav>
-            <form class="border rounded-3 bg-body-tertiary p-3 mb-4" method="get"
-                  th:action="@{/transactions}" th:object="${filters}">
-                <div class="row g-3">
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="keyword">Tìm trong ghi chú</label>
-                        <input class="form-control" type="search" id="keyword" th:field="*{keyword}"
-                               maxlength="1000" placeholder="Nhập từ khóa">
+<th:block xmlns:th="http://www.thymeleaf.org"
+          th:replace="~{layout/main-layout :: layout('Giao dịch', 'transactions', ~{::content})}">
+    <div th:fragment="content" class="page-content">
+        <section class="card border-0 rounded-4 shadow-sm">
+            <div class="card-body p-4 p-md-5">
+                <h1 class="h3 mb-3">Giao dịch của tôi</h1>
+                <p class="page-description mb-4">Theo dõi dòng tiền và tìm lại những khoản thu, chi của bạn.</p>
+                <nav class="d-flex flex-wrap align-items-center justify-content-between gap-3 my-4"
+                     aria-label="Điều hướng giao dịch">
+                    <a class="btn btn-primary" th:href="@{/transactions/new}">Thêm giao dịch</a>
+                    <a class="btn btn-outline-success" th:href="@{/transactions/export}">Xuất tất cả CSV</a>
+                </nav>
+                <form class="border rounded-3 bg-body-tertiary p-3 mb-4" method="get"
+                      th:action="@{/transactions}" th:object="${filters}">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="keyword">Tìm trong ghi chú</label>
+                            <input class="form-control" type="search" id="keyword" th:field="*{keyword}"
+                                   maxlength="1000" placeholder="Nhập từ khóa">
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="categoryId">Danh mục</label>
+                            <select class="form-select" id="categoryId" th:field="*{categoryId}">
+                                <option value="">Tất cả danh mục</option>
+                                <option th:each="cat : ${categories}"
+                                        th:value="${cat.id}"
+                                        th:text="${cat.name}"></option>
+                            </select>
+                            <button class="btn btn-outline-secondary btn-sm mt-2" type="button" id="load-categories"
+                                    th:if="${hasMoreCategories}"
+                                    th:data-url="@{/transactions/categories(page=1)}">Tải thêm danh mục
+                            </button>
+                            <p class="alert alert-danger mt-2" id="category-load-error" role="alert" hidden></p>
+                            <noscript th:if="${hasMoreCategories}">Bật JavaScript để tải các danh mục còn lại.
+                            </noscript>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="startDate">Từ ngày</label>
+                            <input class="form-control" type="date" id="startDate" th:field="*{startDate}"
+                                   min="1000-01-01" max="9999-12-31">
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="endDate">Đến ngày</label>
+                            <input class="form-control" type="date" id="endDate" th:field="*{endDate}"
+                                   min="1000-01-01" max="9999-12-31">
+                        </div>
+                        <div class="col-12 d-flex flex-wrap gap-2">
+                            <button class="btn btn-primary" type="submit">Tìm kiếm</button>
+                            <a class="btn btn-outline-secondary" th:href="@{/transactions}">Xóa bộ lọc</a>
+                        </div>
                     </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="categoryId">Danh mục</label>
-                        <select class="form-select" id="categoryId" th:field="*{categoryId}">
-                            <option value="">Tất cả danh mục</option>
-                            <option th:each="cat : ${categories}"
-                                    th:value="${cat.id}"
-                                    th:text="${cat.name}"></option>
-                        </select>
-                        <button class="btn btn-outline-secondary btn-sm mt-2" type="button" id="load-categories"
-                                th:if="${hasMoreCategories}"
-                                th:data-url="@{/transactions/categories(page=1)}">Tải thêm danh mục</button>
-                        <p class="alert alert-danger mt-2" id="category-load-error" role="alert" hidden></p>
-                        <noscript th:if="${hasMoreCategories}">Bật JavaScript để tải các danh mục còn lại.</noscript>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="startDate">Từ ngày</label>
-                        <input class="form-control" type="date" id="startDate" th:field="*{startDate}"
-                               min="1000-01-01" max="9999-12-31">
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="endDate">Đến ngày</label>
-                        <input class="form-control" type="date" id="endDate" th:field="*{endDate}"
-                               min="1000-01-01" max="9999-12-31">
-                    </div>
-                    <div class="col-12 d-flex flex-wrap gap-2">
-                        <button class="btn btn-primary" type="submit">Tìm kiếm</button>
-                        <a class="btn btn-outline-secondary" th:href="@{/transactions}">Xóa bộ lọc</a>
-                    </div>
+                </form>
+                <p class="empty-state" th:if="${transactions.totalElements == 0}"
+                   th:text="${filters.active ? 'Không có giao dịch phù hợp với bộ lọc.' : 'Bạn chưa có giao dịch nào.'}"></p>
+                <div class="table-responsive" th:if="${!transactions.empty}">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th scope="col">Ngày</th>
+                            <th scope="col">Danh mục</th>
+                            <th class="text-end" scope="col">Số tiền</th>
+                            <th scope="col">Ghi chú</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="transaction : ${transactions.content}">
+                            <td th:text="${transaction.occurredOn}"></td>
+                            <td th:text="${categoryNames[transaction.categoryId]}"></td>
+                            <td class="text-end text-nowrap font-monospace fw-semibold"
+                                th:classappend="${categoryTypes[transaction.categoryId] == 'CHI' ? 'text-danger' : 'text-success'}"
+                                th:text="${transaction.amount.toPlainString()}"></td>
+                            <td th:text="${transaction.note}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
                 </div>
-            </form>
-            <p class="alert alert-info" th:if="${transactions.totalElements == 0}"
-               th:text="${filters.active ? 'Không có giao dịch phù hợp với bộ lọc.' : 'Bạn chưa có giao dịch nào.'}"></p>
-            <div class="table-responsive" th:if="${!transactions.empty}">
-                <table class="table table-bordered table-striped table-hover align-middle mb-0">
-                    <thead class="table-light">
-                    <tr>
-                        <th scope="col">Ngày</th>
-                        <th scope="col">Danh mục</th>
-                        <th class="text-end" scope="col">Số tiền</th>
-                        <th scope="col">Ghi chú</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="transaction : ${transactions.content}">
-                        <td th:text="${transaction.occurredOn}"></td>
-                        <td th:text="${categoryNames[transaction.categoryId]}"></td>
-                        <td class="text-end text-nowrap font-monospace fw-semibold"
-                            th:classappend="${categoryTypes[transaction.categoryId] == 'CHI' ? 'text-danger' : 'text-success'}"
-                            th:text="${transaction.amount.toPlainString()}"></td>
-                        <td th:text="${transaction.note}"></td>
-                    </tr>
-                    </tbody>
-                </table>
+                <nav class="d-flex flex-wrap align-items-center justify-content-between gap-3 my-4"
+                     aria-label="Phân trang"
+                     th:if="${transactions.totalPages > 1}">
+                    <a class="btn btn-outline-secondary" th:if="${transactions.hasPrevious()}"
+                       th:href="@{/transactions(page=${transactions.number - 1},keyword=${filters.keyword},
+                               categoryId=${filters.categoryId},startDate=${filters.startDate},endDate=${filters.endDate})}">
+                        Trang trước
+                    </a>
+                    <span th:text="|Trang ${transactions.number + 1} / ${transactions.totalPages}|"></span>
+                    <a class="btn btn-outline-secondary" th:if="${transactions.hasNext()}"
+                       th:href="@{/transactions(page=${transactions.number + 1},keyword=${filters.keyword},
+                               categoryId=${filters.categoryId},startDate=${filters.startDate},endDate=${filters.endDate})}">
+                        Trang sau
+                    </a>
+                </nav>
             </div>
-            <nav class="d-flex flex-wrap align-items-center justify-content-between gap-3 my-4" aria-label="Phân trang"
-                 th:if="${transactions.totalPages > 1}">
-                <a class="btn btn-outline-secondary" th:if="${transactions.hasPrevious()}"
-                   th:href="@{/transactions(page=${transactions.number - 1},keyword=${filters.keyword},
-                       categoryId=${filters.categoryId},startDate=${filters.startDate},endDate=${filters.endDate})}">Trang trước</a>
-                <span th:text="|Trang ${transactions.number + 1} / ${transactions.totalPages}|"></span>
-                <a class="btn btn-outline-secondary" th:if="${transactions.hasNext()}"
-                   th:href="@{/transactions(page=${transactions.number + 1},keyword=${filters.keyword},
-                       categoryId=${filters.categoryId},startDate=${filters.startDate},endDate=${filters.endDate})}">Trang sau</a>
-            </nav>
-        </div>
-    </section>
-</main>
-</body>
-</html>
+        </section>
+        <script defer th:src="@{/js/category-options.js}"></script>
+    </div>
+</th:block>
