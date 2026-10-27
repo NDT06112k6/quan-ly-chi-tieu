@@ -81,17 +81,26 @@ public class TransactionService {
         }
 
         YearMonth month = YearMonth.from(occurredOn);
+        LocalDate startDate = month.atDay(1);
+        LocalDate endDate = month.atEndOfMonth();
         Optional<Budget> budget = budgetRepository.findByUserIdAndCategoryIdAndMonth(
-                userId, categoryId, month.atDay(1));
+                userId, categoryId, startDate);
         if (budget.isEmpty()) {
             return warning;
         }
 
-        BigDecimal totalExpense = transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(
-                userId, categoryId, month).setScale(MONEY_SCALE);
-        BigDecimal limitAmount = budget.get().getLimitAmount().setScale(MONEY_SCALE);
+        BigDecimal totalExpense = transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                userId, categoryId, startDate, endDate).setScale(MONEY_SCALE);
+        warning = createBudgetWarning(category, budget.get(), totalExpense);
+        return warning;
+    }
+
+    private Optional<String> createBudgetWarning(Category category, Budget budget, BigDecimal totalExpense) {
+        Optional<String> warning = Optional.empty();
+        BigDecimal limitAmount = budget.getLimitAmount().setScale(MONEY_SCALE);
         if (totalExpense.compareTo(limitAmount) > 0) {
             BigDecimal exceededAmount = totalExpense.subtract(limitAmount);
+            YearMonth month = YearMonth.from(budget.getMonth());
             String message = BUDGET_WARNING_MESSAGE.formatted(category.getName(), month,
                     totalExpense.toPlainString(), limitAmount.toPlainString(), exceededAmount.toPlainString());
             warning = Optional.of(message);
@@ -230,8 +239,11 @@ public class TransactionService {
 
     public DashboardDTO getDashboardData(@NotNull @Positive Long userId,
             @Min(1) @Max(12) int month, @Min(1) @Max(9999) int year) {
-        BigDecimal totalIncome = transactionRepository.sumIncomeByUserIdAndMonth(userId, month, year);
-        BigDecimal totalExpense = transactionRepository.sumExpenseByUserIdAndMonth(userId, month, year);
+        YearMonth reportingMonth = YearMonth.of(year, month);
+        LocalDate startDate = reportingMonth.atDay(1);
+        LocalDate endDate = reportingMonth.atEndOfMonth();
+        BigDecimal totalIncome = transactionRepository.sumIncomeByUserIdAndDateRange(userId, startDate, endDate);
+        BigDecimal totalExpense = transactionRepository.sumExpenseByUserIdAndDateRange(userId, startDate, endDate);
         totalIncome = totalIncome.setScale(MONEY_SCALE);
         totalExpense = totalExpense.setScale(MONEY_SCALE);
         BigDecimal balance = totalIncome.subtract(totalExpense);
@@ -242,10 +254,12 @@ public class TransactionService {
 
     public Page<CategoryExpenseDTO> getExpensesByCategory(@NotNull @Positive Long userId,
             @NotNull YearMonth month, @NotNull Pageable pageable) {
+        LocalDate startDate = month.atDay(1);
+        LocalDate endDate = month.atEndOfMonth();
         int pageSize = Math.min(pageable.getPageSize(), MAX_PAGE_SIZE);
         Pageable boundedPageable = PageRequest.of(pageable.getPageNumber(), pageSize);
-        Page<CategoryExpenseDTO> expenses = transactionRepository.sumExpensesByCategoryForUserAndMonth(
-                userId, month, boundedPageable);
+        Page<CategoryExpenseDTO> expenses = transactionRepository.sumExpensesByCategoryForUserAndDateRange(
+                userId, startDate, endDate, boundedPageable);
         return expenses;
     }
 

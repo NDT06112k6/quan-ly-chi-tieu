@@ -224,9 +224,9 @@ class TransactionServiceTests {
     @CsvSource({"100, 25.5, 74.50", "10.10, 20.20, -10.10", "0, 0, 0.00"})
     void calculatesUserMonthlyBalanceWithTwoDecimalPlaces(String income, String expense, String balance) {
         YearMonth month = YearMonth.from(TRANSACTION_DATE);
-        when(transactionRepository.sumIncomeByUserIdAndMonth(USER_ID, month.getMonthValue(), month.getYear()))
+        when(transactionRepository.sumIncomeByUserIdAndDateRange(USER_ID, month.atDay(1), month.atEndOfMonth()))
                 .thenReturn(new BigDecimal(income));
-        when(transactionRepository.sumExpenseByUserIdAndMonth(USER_ID, month.getMonthValue(), month.getYear()))
+        when(transactionRepository.sumExpenseByUserIdAndDateRange(USER_ID, month.atDay(1), month.atEndOfMonth()))
                 .thenReturn(new BigDecimal(expense));
 
         DashboardDTO dashboard = transactionService.getDashboardData(USER_ID, month.getMonthValue(), month.getYear());
@@ -234,22 +234,49 @@ class TransactionServiceTests {
         assertEquals(new BigDecimal(income).setScale(2), dashboard.getTotalIncome());
         assertEquals(new BigDecimal(expense).setScale(2), dashboard.getTotalExpense());
         assertEquals(new BigDecimal(balance), dashboard.getBalance());
-        verify(transactionRepository).sumIncomeByUserIdAndMonth(USER_ID, month.getMonthValue(), month.getYear());
-        verify(transactionRepository).sumExpenseByUserIdAndMonth(USER_ID, month.getMonthValue(), month.getYear());
+        verify(transactionRepository).sumIncomeByUserIdAndDateRange(USER_ID, month.atDay(1), month.atEndOfMonth());
+        verify(transactionRepository).sumExpenseByUserIdAndDateRange(USER_ID, month.atDay(1), month.atEndOfMonth());
     }
 
     @Test
     void stopsDashboardCalculationWhenIncomeLookupFails() {
         YearMonth month = YearMonth.from(TRANSACTION_DATE);
         DataAccessResourceFailureException failure = new DataAccessResourceFailureException("Test database failure");
-        when(transactionRepository.sumIncomeByUserIdAndMonth(USER_ID, month.getMonthValue(), month.getYear()))
+        when(transactionRepository.sumIncomeByUserIdAndDateRange(USER_ID, month.atDay(1), month.atEndOfMonth()))
                 .thenThrow(failure);
 
         assertThatThrownBy(() -> transactionService.getDashboardData(USER_ID, month.getMonthValue(), month.getYear()))
                 .isSameAs(failure);
 
-        verify(transactionRepository).sumIncomeByUserIdAndMonth(USER_ID, month.getMonthValue(), month.getYear());
+        verify(transactionRepository).sumIncomeByUserIdAndDateRange(USER_ID, month.atDay(1), month.atEndOfMonth());
         verifyNoMoreInteractions(transactionRepository);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "2024-02, 2024-02-01, 2024-02-29",
+            "2023-02, 2023-02-01, 2023-02-28",
+            "2026-12, 2026-12-01, 2026-12-31",
+            "2027-01, 2027-01-01, 2027-01-31",
+            "1000-01, 1000-01-01, 1000-01-31",
+            "9999-12, 9999-12-01, 9999-12-31"
+    })
+    void passesInclusiveCalendarDateBoundsToDashboardAndChartQueries(String monthValue, String firstDay, String lastDay) {
+        YearMonth month = YearMonth.parse(monthValue);
+        LocalDate startDate = LocalDate.parse(firstDay);
+        LocalDate endDate = LocalDate.parse(lastDay);
+        Pageable pageable = PageRequest.of(0, TransactionService.DEFAULT_PAGE_SIZE);
+        when(transactionRepository.sumIncomeByUserIdAndDateRange(USER_ID, startDate, endDate)).thenReturn(BigDecimal.ZERO);
+        when(transactionRepository.sumExpenseByUserIdAndDateRange(USER_ID, startDate, endDate)).thenReturn(BigDecimal.ZERO);
+        when(transactionRepository.sumExpensesByCategoryForUserAndDateRange(USER_ID, startDate, endDate, pageable))
+                .thenReturn(Page.empty(pageable));
+
+        transactionService.getDashboardData(USER_ID, month.getMonthValue(), month.getYear());
+        transactionService.getExpensesByCategory(USER_ID, month, pageable);
+
+        verify(transactionRepository).sumIncomeByUserIdAndDateRange(USER_ID, startDate, endDate);
+        verify(transactionRepository).sumExpenseByUserIdAndDateRange(USER_ID, startDate, endDate);
+        verify(transactionRepository).sumExpensesByCategoryForUserAndDateRange(USER_ID, startDate, endDate, pageable);
     }
 
     @ParameterizedTest
@@ -260,13 +287,15 @@ class TransactionServiceTests {
         Pageable expectedPage = PageRequest.of(1, expectedSize);
         CategoryExpenseDTO expense = new CategoryExpenseDTO("Food", TRANSACTION_AMOUNT);
         Page<CategoryExpenseDTO> expectedExpenses = new PageImpl<>(List.of(expense), expectedPage, 101);
-        when(transactionRepository.sumExpensesByCategoryForUserAndMonth(USER_ID, month, expectedPage))
+        when(transactionRepository.sumExpensesByCategoryForUserAndDateRange(
+                USER_ID, month.atDay(1), month.atEndOfMonth(), expectedPage))
                 .thenReturn(expectedExpenses);
 
         Page<CategoryExpenseDTO> result = transactionService.getExpensesByCategory(USER_ID, month, requestedPage);
 
         assertSame(expectedExpenses, result);
-        verify(transactionRepository).sumExpensesByCategoryForUserAndMonth(USER_ID, month, expectedPage);
+        verify(transactionRepository).sumExpensesByCategoryForUserAndDateRange(
+                USER_ID, month.atDay(1), month.atEndOfMonth(), expectedPage);
     }
 
     @Test

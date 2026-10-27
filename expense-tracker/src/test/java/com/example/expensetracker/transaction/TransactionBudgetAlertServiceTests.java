@@ -58,7 +58,8 @@ class TransactionBudgetAlertServiceTests {
         YearMonth month = TRANSACTION_MONTH;
         configureCategory(CategoryType.CHI);
         configureBudget(month);
-        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, month))
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, CATEGORY_ID, month.atDay(1), month.atEndOfMonth()))
                 .thenReturn(new BigDecimal("100.10"));
         TransactionDTO dto = transactionDto();
 
@@ -70,7 +71,8 @@ class TransactionBudgetAlertServiceTests {
         writesAndChecks.verify(categoryRepository).findByIdAndUserIdForUpdate(CATEGORY_ID, USER_ID);
         writesAndChecks.verify(transactionRepository).saveAndFlush(any(Transaction.class));
         writesAndChecks.verify(budgetRepository).findByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, month.atDay(1));
-        writesAndChecks.verify(transactionRepository).sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, month);
+        writesAndChecks.verify(transactionRepository).sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, CATEGORY_ID, month.atDay(1), month.atEndOfMonth());
     }
 
     @ParameterizedTest
@@ -79,7 +81,8 @@ class TransactionBudgetAlertServiceTests {
         YearMonth month = TRANSACTION_MONTH;
         configureCategory(CategoryType.CHI);
         configureBudget(month);
-        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, month))
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, CATEGORY_ID, month.atDay(1), month.atEndOfMonth()))
                 .thenReturn(new BigDecimal(total));
 
         Optional<String> warning = transactionService.createTransaction(transactionDto(), USER_ID);
@@ -150,7 +153,8 @@ class TransactionBudgetAlertServiceTests {
         configureCategory(CategoryType.CHI);
         configureBudget(month);
         DataAccessResourceFailureException failure = new DataAccessResourceFailureException("Expense query failed");
-        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, month))
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, CATEGORY_ID, month.atDay(1), month.atEndOfMonth()))
                 .thenThrow(failure);
 
         assertThatThrownBy(() -> transactionService.createTransaction(transactionDto(), USER_ID)).isSameAs(failure);
@@ -162,7 +166,8 @@ class TransactionBudgetAlertServiceTests {
         YearMonth transactionMonth = YearMonth.parse(value);
         configureCategory(CategoryType.CHI);
         configureBudget(transactionMonth);
-        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, transactionMonth))
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, CATEGORY_ID, transactionMonth.atDay(1), transactionMonth.atEndOfMonth()))
                 .thenReturn(new BigDecimal("110.00"));
         TransactionDTO dto = transactionDto();
         dto.setOccurredOn(transactionMonth.atEndOfMonth());
@@ -180,7 +185,8 @@ class TransactionBudgetAlertServiceTests {
         configureCategory(CategoryType.CHI);
         configureBudget(TRANSACTION_MONTH);
         configureSuccessfulUpdate(CATEGORY_ID);
-        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH))
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, CATEGORY_ID, TRANSACTION_MONTH.atDay(1), TRANSACTION_MONTH.atEndOfMonth()))
                 .thenReturn(new BigDecimal("100.10"));
         TransactionDTO dto = transactionDto();
         dto.setOccurredOn(TRANSACTION_MONTH.atEndOfMonth());
@@ -188,7 +194,8 @@ class TransactionBudgetAlertServiceTests {
         Optional<String> warning = transactionService.updateTransaction(TRANSACTION_ID, dto, USER_ID);
 
         assertThat(warning.orElseThrow()).contains("2024-02", "vượt 0.10.");
-        verify(transactionRepository, times(1)).sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH);
+        verify(transactionRepository, times(1)).sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, CATEGORY_ID, TRANSACTION_MONTH.atDay(1), TRANSACTION_MONTH.atEndOfMonth());
     }
 
     @ParameterizedTest
@@ -198,7 +205,8 @@ class TransactionBudgetAlertServiceTests {
         configureCategory(CategoryType.CHI);
         configureBudget(TRANSACTION_MONTH);
         configureSuccessfulUpdate(CATEGORY_ID);
-        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH))
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, CATEGORY_ID, TRANSACTION_MONTH.atDay(1), TRANSACTION_MONTH.atEndOfMonth()))
                 .thenReturn(new BigDecimal(total));
 
         Optional<String> warning = transactionService.updateTransaction(TRANSACTION_ID, transactionDto(), USER_ID);
@@ -214,9 +222,11 @@ class TransactionBudgetAlertServiceTests {
         configureBudget(TRANSACTION_MONTH);
         configureBudget(updatedMonth);
         configureSuccessfulUpdate(CATEGORY_ID);
-        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH))
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, CATEGORY_ID, TRANSACTION_MONTH.atDay(1), TRANSACTION_MONTH.atEndOfMonth()))
                 .thenReturn(new BigDecimal("110.00"));
-        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, updatedMonth))
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, CATEGORY_ID, updatedMonth.atDay(1), updatedMonth.atEndOfMonth()))
                 .thenReturn(new BigDecimal("130.00"));
         TransactionDTO dto = transactionDto();
         dto.setOccurredOn(updatedMonth.atDay(1));
@@ -234,9 +244,11 @@ class TransactionBudgetAlertServiceTests {
         configureBudget(TRANSACTION_MONTH);
         configureOtherCategoryBudget(updatedCategoryId);
         configureSuccessfulUpdate(updatedCategoryId);
-        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH))
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, CATEGORY_ID, TRANSACTION_MONTH.atDay(1), TRANSACTION_MONTH.atEndOfMonth()))
                 .thenReturn(new BigDecimal("110.00"));
-        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, updatedCategoryId, TRANSACTION_MONTH))
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, updatedCategoryId, TRANSACTION_MONTH.atDay(1), TRANSACTION_MONTH.atEndOfMonth()))
                 .thenReturn(new BigDecimal("120.00"));
         TransactionDTO dto = transactionDto();
         dto.setCategoryId(updatedCategoryId);
@@ -257,7 +269,8 @@ class TransactionBudgetAlertServiceTests {
         configureCategory(CategoryType.CHI);
         configureBudget(TRANSACTION_MONTH);
         when(transactionRepository.deleteByIdAndUserId(TRANSACTION_ID, USER_ID)).thenReturn(1);
-        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH))
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, CATEGORY_ID, TRANSACTION_MONTH.atDay(1), TRANSACTION_MONTH.atEndOfMonth()))
                 .thenReturn(new BigDecimal("110.00"));
 
         Optional<String> warning = transactionService.deleteTransaction(TRANSACTION_ID, USER_ID);
@@ -266,7 +279,8 @@ class TransactionBudgetAlertServiceTests {
         InOrder deletionAndCheck = inOrder(transactionRepository);
         deletionAndCheck.verify(transactionRepository).findByIdAndUserIdForUpdate(TRANSACTION_ID, USER_ID);
         deletionAndCheck.verify(transactionRepository).deleteByIdAndUserId(TRANSACTION_ID, USER_ID);
-        deletionAndCheck.verify(transactionRepository).sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH);
+        deletionAndCheck.verify(transactionRepository).sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, CATEGORY_ID, TRANSACTION_MONTH.atDay(1), TRANSACTION_MONTH.atEndOfMonth());
     }
 
     @ParameterizedTest
@@ -276,7 +290,8 @@ class TransactionBudgetAlertServiceTests {
         configureCategory(CategoryType.CHI);
         configureBudget(TRANSACTION_MONTH);
         when(transactionRepository.deleteByIdAndUserId(TRANSACTION_ID, USER_ID)).thenReturn(1);
-        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH))
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                USER_ID, CATEGORY_ID, TRANSACTION_MONTH.atDay(1), TRANSACTION_MONTH.atEndOfMonth()))
                 .thenReturn(new BigDecimal(total));
 
         Optional<String> warning = transactionService.deleteTransaction(TRANSACTION_ID, USER_ID);

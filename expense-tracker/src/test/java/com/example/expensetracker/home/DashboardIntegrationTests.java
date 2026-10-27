@@ -12,9 +12,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -141,6 +144,26 @@ class DashboardIntegrationTests {
         assertThat(dashboard.getTotalIncome()).isEqualByComparingTo("2.02");
         assertThat(dashboard.getTotalExpense()).isEqualByComparingTo("0.00");
         assertThat(dashboard.getBalance()).isEqualByComparingTo("2.02");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1000-01", "9999-12"})
+    void aggregatesDashboardAndChartAtSupportedDateRangeLimits(String monthValue) {
+        YearMonth month = YearMonth.parse(monthValue);
+        persistTransaction(incomeCategory, "1.01", month.atDay(1));
+        persistTransaction(incomeCategory, "1.01", month.atEndOfMonth());
+        persistTransaction(expenseCategory, "0.10", month.atEndOfMonth());
+        persistTransaction(foreignIncomeCategory, "999.00", month.atDay(1));
+        persistTransaction(foreignExpenseCategory, "999.00", month.atEndOfMonth());
+
+        DashboardDTO dashboard = transactionService.getDashboardData(owner.getId(), month.getMonthValue(), month.getYear());
+        Page<CategoryExpenseDTO> chart = transactionService.getExpensesByCategory(owner.getId(), month, PageRequest.of(0, 20));
+
+        assertThat(dashboard.getTotalIncome()).isEqualByComparingTo("2.02");
+        assertThat(dashboard.getTotalExpense()).isEqualByComparingTo("0.10");
+        assertThat(dashboard.getBalance()).isEqualByComparingTo("1.92");
+        assertThat(chart.getContent()).hasSize(1);
+        assertThat(chart.getContent().getFirst().totalAmount()).isEqualByComparingTo("0.10");
     }
 
     @ParameterizedTest

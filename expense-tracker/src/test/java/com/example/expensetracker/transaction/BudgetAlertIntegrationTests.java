@@ -96,8 +96,8 @@ class BudgetAlertIntegrationTests {
                 .andExpect(flash().attribute("success", "Thêm giao dịch thành công!"))
                 .andReturn();
 
-        BigDecimal total = transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(
-                owner.getId(), expenseCategory.getId(), month);
+        BigDecimal total = transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                owner.getId(), expenseCategory.getId(), month.atDay(1), month.atEndOfMonth());
         assertThat(total).isEqualByComparingTo("100.20");
         assertWarningShownOnlyOnce(result);
     }
@@ -288,8 +288,8 @@ class BudgetAlertIntegrationTests {
     }
 
     private void assertExpenseTotal(Category category, YearMonth budgetMonth, String expected) {
-        BigDecimal total = transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(
-                owner.getId(), category.getId(), budgetMonth);
+        BigDecimal total = transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                owner.getId(), category.getId(), budgetMonth.atDay(1), budgetMonth.atEndOfMonth());
         assertThat(total).isEqualByComparingTo(expected);
     }
 
@@ -311,8 +311,8 @@ class BudgetAlertIntegrationTests {
                 .andExpect(status().isForbidden())
                 .andExpect(flash().attributeCount(0));
 
-        BigDecimal total = transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(
-                otherUser.getId(), foreignCategory.getId(), month);
+        BigDecimal total = transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                otherUser.getId(), foreignCategory.getId(), month.atDay(1), month.atEndOfMonth());
         assertThat(total).isEqualByComparingTo(BigDecimal.ZERO);
     }
 

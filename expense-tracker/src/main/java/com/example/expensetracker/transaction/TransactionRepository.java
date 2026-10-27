@@ -14,7 +14,6 @@ import jakarta.persistence.LockModeType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 
@@ -74,11 +73,12 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
                 AND category.userId = :userId
                 AND category.id = :categoryId
                 AND category.type = com.example.expensetracker.category.CategoryType.CHI
-                AND transaction.occurredOn >= :#{#month.atDay(1)}
-                AND transaction.occurredOn <= :#{#month.atEndOfMonth()}
+                AND transaction.occurredOn >= :startDate
+                AND transaction.occurredOn <= :endDate
             """)
-    BigDecimal sumExpensesByUserIdAndCategoryIdAndMonth(@Param("userId") Long userId,
-            @Param("categoryId") Long categoryId, @Param("month") YearMonth month);
+    BigDecimal sumExpensesByUserIdAndCategoryIdAndDateRange(@Param("userId") Long userId,
+            @Param("categoryId") Long categoryId, @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 
     @Query(value = """
             SELECT new com.example.expensetracker.home.CategoryExpenseDTO(category.name, SUM(transaction.amount))
@@ -88,8 +88,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             WHERE transaction.userId = :userId
                 AND category.userId = :userId
                 AND category.type = com.example.expensetracker.category.CategoryType.CHI
-                AND MONTH(transaction.occurredOn) = :#{#month.monthValue}
-                AND YEAR(transaction.occurredOn) = :#{#month.year}
+                AND transaction.occurredOn >= :startDate
+                AND transaction.occurredOn <= :endDate
             GROUP BY category.id, category.name
             ORDER BY category.id ASC
             """, countQuery = """
@@ -100,11 +100,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             WHERE transaction.userId = :userId
                 AND category.userId = :userId
                 AND category.type = com.example.expensetracker.category.CategoryType.CHI
-                AND MONTH(transaction.occurredOn) = :#{#month.monthValue}
-                AND YEAR(transaction.occurredOn) = :#{#month.year}
+                AND transaction.occurredOn >= :startDate
+                AND transaction.occurredOn <= :endDate
             """)
-    Page<CategoryExpenseDTO> sumExpensesByCategoryForUserAndMonth(
-            @Param("userId") Long userId, @Param("month") YearMonth month, Pageable pageable);
+    Page<CategoryExpenseDTO> sumExpensesByCategoryForUserAndDateRange(@Param("userId") Long userId,
+            @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate, Pageable pageable);
 
     @Query("""
             SELECT COALESCE(SUM(transaction.amount), 0)
@@ -114,11 +114,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             WHERE transaction.userId = :userId
                 AND category.userId = :userId
                 AND category.type = com.example.expensetracker.category.CategoryType.THU
-                AND MONTH(transaction.occurredOn) = :month
-                AND YEAR(transaction.occurredOn) = :year
+                AND transaction.occurredOn >= :startDate
+                AND transaction.occurredOn <= :endDate
             """)
-    BigDecimal sumIncomeByUserIdAndMonth(
-            @Param("userId") Long userId, @Param("month") int month, @Param("year") int year);
+    BigDecimal sumIncomeByUserIdAndDateRange(@Param("userId") Long userId,
+            @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
     @Query("""
             SELECT COALESCE(SUM(transaction.amount), 0)
@@ -128,11 +128,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             WHERE transaction.userId = :userId
                 AND category.userId = :userId
                 AND category.type = com.example.expensetracker.category.CategoryType.CHI
-                AND MONTH(transaction.occurredOn) = :month
-                AND YEAR(transaction.occurredOn) = :year
+                AND transaction.occurredOn >= :startDate
+                AND transaction.occurredOn <= :endDate
             """)
-    BigDecimal sumExpenseByUserIdAndMonth(
-            @Param("userId") Long userId, @Param("month") int month, @Param("year") int year);
+    BigDecimal sumExpenseByUserIdAndDateRange(@Param("userId") Long userId,
+            @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional

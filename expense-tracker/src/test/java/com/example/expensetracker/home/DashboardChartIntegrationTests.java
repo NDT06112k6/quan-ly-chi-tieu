@@ -158,6 +158,30 @@ class DashboardChartIntegrationTests {
         assertThat(expenses.getContent().getFirst().totalAmount()).isEqualTo(new BigDecimal("0.30"));
     }
 
+    @ParameterizedTest
+    @MethodSource("boundaryMonths")
+    void paginatedGroupCountUsesTheSameDateRangeAndOwnerAsTheAmounts(YearMonth month) {
+        Category secondCategory = persistCategory(owner, "Transport", CategoryType.CHI);
+        Category outsideCategory = persistCategory(owner, "Outside period", CategoryType.CHI);
+        persistTransaction(expenseCategory, "1.00", month.atDay(1));
+        persistTransaction(secondCategory, "2.00", month.atEndOfMonth());
+        persistTransaction(outsideCategory, "999.00", month.atDay(1).minusDays(1));
+        persistTransaction(foreignCategory, "999.00", month.atDay(1));
+
+        Page<CategoryExpenseDTO> firstPage = transactionService.getExpensesByCategory(
+                owner.getId(), month, PageRequest.of(0, 1));
+        Page<CategoryExpenseDTO> secondPage = transactionService.getExpensesByCategory(
+                owner.getId(), month, PageRequest.of(1, 1));
+
+        assertThat(firstPage.getTotalElements()).isEqualTo(2);
+        assertThat(firstPage.getTotalPages()).isEqualTo(2);
+        assertThat(firstPage.getContent().getFirst().categoryName()).isEqualTo(expenseCategory.getName());
+        assertThat(firstPage.getContent().getFirst().totalAmount()).isEqualByComparingTo("1.00");
+        assertThat(secondPage.getTotalElements()).isEqualTo(2);
+        assertThat(secondPage.getContent().getFirst().categoryName()).isEqualTo("Transport");
+        assertThat(secondPage.getContent().getFirst().totalAmount()).isEqualByComparingTo("2.00");
+    }
+
     private Category persistCategory(User categoryOwner, String name, CategoryType type) {
         Category category = new Category(categoryOwner.getId(), name, type);
         entityManager.persist(category);

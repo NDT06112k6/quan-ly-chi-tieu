@@ -319,8 +319,21 @@ contains `DashboardDTO` monetary values, the month and the year; the shared
 layout also receives the authenticated user's profile DTO.
 
 The repository aggregates `THU` and `CHI` separately by transaction date,
-filtering both transactions and joined categories by the same user ID. A month
-with no matching transactions totals zero through SQL `COALESCE`; database
+filtering both transactions and joined categories by the same user ID.
+All transaction aggregation queries accept explicit `LocalDate startDate` and
+`LocalDate endDate` parameters and filter with `occurredOn >= :startDate` and
+`occurredOn <= :endDate`. This includes dashboard income/expense totals,
+category expense groups and their pagination count query, and budget alerts.
+`TransactionService` computes the month's first and last date before calling
+the repository: the dashboard uses the reporting month/year supplied
+by its controller, and alerts use the transaction's `occurredOn` month. Repository
+method names end in `DateRange`; callers must supply both inclusive bounds.
+No `MONTH()` or `YEAR()` function wraps `occurred_on`, allowing the existing
+`idx_transactions_user_occurred_on (user_id, occurred_on)` index to be considered
+for date range access. This refactor requires no migration, dependency,
+environment variable or cache changes.
+
+A month with no matching transactions totals zero through SQL `COALESCE`; database
 failures are not converted to zeros. The service uses a read-only transaction
 for the two sums and `BigDecimal` subtraction for the balance. Stored totals
 retain two decimal places; the HTML displays whole dong with comma grouping
