@@ -31,6 +31,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -225,7 +226,8 @@ class TransactionControllerTests {
         mockMvc.perform(validEditRequest().param("id", "999").param("userId", "99"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl(DETAIL_PATH))
-                .andExpect(flash().attribute("success", "Cập nhật giao dịch thành công!"));
+                .andExpect(flash().attribute("success", "Cập nhật giao dịch thành công!"))
+                .andExpect(flash().attributeCount(1));
 
         ArgumentCaptor<TransactionDTO> dtoCaptor = ArgumentCaptor.forClass(TransactionDTO.class);
         verify(transactionService).updateTransaction(eq(TRANSACTION_ID), dtoCaptor.capture(), eq(USER_ID));
@@ -263,9 +265,35 @@ class TransactionControllerTests {
         mockMvc.perform(post(DELETE_PATH).with(user(USERNAME)).with(csrf()).param("userId", "99"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/transactions"))
-                .andExpect(flash().attribute("success", "Xóa giao dịch thành công!"));
+                .andExpect(flash().attribute("success", "Xóa giao dịch thành công!"))
+                .andExpect(flash().attributeCount(1));
 
         verify(transactionService).deleteTransaction(TRANSACTION_ID, USER_ID);
+    }
+
+    @Test
+    void editPropagatesBudgetWarningAlongsideSuccess() throws Exception {
+        String message = "Ngân sách tháng 2024-02 vượt 10.00.";
+        when(transactionService.updateTransaction(eq(TRANSACTION_ID), any(TransactionDTO.class), eq(USER_ID)))
+                .thenReturn(Optional.of(message));
+
+        mockMvc.perform(validEditRequest())
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(DETAIL_PATH))
+                .andExpect(flash().attribute("warning", message))
+                .andExpect(flash().attribute("success", "Cập nhật giao dịch thành công!"));
+    }
+
+    @Test
+    void deletePropagatesBudgetWarningAlongsideSuccess() throws Exception {
+        String message = "Ngân sách tháng 2024-02 vẫn vượt 10.00.";
+        when(transactionService.deleteTransaction(TRANSACTION_ID, USER_ID)).thenReturn(Optional.of(message));
+
+        mockMvc.perform(post(DELETE_PATH).with(user(USERNAME)).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/transactions"))
+                .andExpect(flash().attribute("warning", message))
+                .andExpect(flash().attribute("success", "Xóa giao dịch thành công!"));
     }
 
     @Test

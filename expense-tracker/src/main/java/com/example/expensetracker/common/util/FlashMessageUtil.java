@@ -2,6 +2,8 @@ package com.example.expensetracker.common.util;
 
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.util.Optional;
+
 public final class FlashMessageUtil {
 
     private static final String SUCCESS_ATTRIBUTE = "success";
@@ -21,5 +23,11 @@ public final class FlashMessageUtil {
 
     public static void addWarning(RedirectAttributes redirectAttributes, String message) {
         redirectAttributes.addFlashAttribute(WARNING_ATTRIBUTE, message);
+    }
+
+    public static void addWarningIfPresent(RedirectAttributes redirectAttributes, Optional<String> warning) {
+        if (warning.isPresent()) {
+            addWarning(redirectAttributes, warning.get());
+        }
     }
 }

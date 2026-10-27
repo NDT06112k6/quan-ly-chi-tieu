@@ -17,14 +17,17 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -34,6 +37,8 @@ class TransactionBudgetAlertServiceTests {
 
     private static final Long USER_ID = 42L;
     private static final Long CATEGORY_ID = 7L;
+    private static final Long TRANSACTION_ID = 13L;
+    private static final YearMonth TRANSACTION_MONTH = YearMonth.of(2024, 2);
     private static final BigDecimal LIMIT = new BigDecimal("100.00");
 
     @Mock
@@ -49,8 +54,8 @@ class TransactionBudgetAlertServiceTests {
     private TransactionService transactionService;
 
     @Test
-    void returnsExactExceededAmountAfterSavingExpenseAndUsesOnlyOwnedCurrentMonthBudget() {
-        YearMonth month = YearMonth.now();
+    void returnsExactExceededAmountAfterSavingExpenseAndUsesOwnedTransactionMonthBudget() {
+        YearMonth month = TRANSACTION_MONTH;
         configureCategory(CategoryType.CHI);
         configureBudget(month);
         when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, month))
@@ -71,7 +76,7 @@ class TransactionBudgetAlertServiceTests {
     @ParameterizedTest
     @ValueSource(strings = {"0.00", "99.99", "100.00"})
     void doesNotWarnWhenExpenseTotalIsAtOrBelowLimit(String total) {
-        YearMonth month = YearMonth.now();
+        YearMonth month = TRANSACTION_MONTH;
         configureCategory(CategoryType.CHI);
         configureBudget(month);
         when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, month))
@@ -90,7 +95,7 @@ class TransactionBudgetAlertServiceTests {
         Optional<String> warning = transactionService.createTransaction(transactionDto(), USER_ID);
 
         assertThat(warning).isEmpty();
-        verify(budgetRepository).findByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, YearMonth.now().atDay(1));
+        verify(budgetRepository).findByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH.atDay(1));
         verify(transactionRepository).saveAndFlush(any(Transaction.class));
         verifyNoMoreInteractions(transactionRepository);
     }
@@ -119,7 +124,7 @@ class TransactionBudgetAlertServiceTests {
 
     @Test
     void doesNotCheckBudgetWhenTransactionCannotBeSaved() {
-        configureCategory(CategoryType.CHI);
+        configureLockedCategory(CategoryType.CHI);
         DataAccessResourceFailureException failure = new DataAccessResourceFailureException("Insert failed");
         when(transactionRepository.saveAndFlush(any(Transaction.class))).thenThrow(failure);
 
@@ -130,7 +135,7 @@ class TransactionBudgetAlertServiceTests {
 
     @Test
     void preservesBudgetLookupFailureInsteadOfReturningNoWarning() {
-        YearMonth month = YearMonth.now();
+        YearMonth month = TRANSACTION_MONTH;
         configureCategory(CategoryType.CHI);
         DataAccessResourceFailureException failure = new DataAccessResourceFailureException("Budget lookup failed");
         when(budgetRepository.findByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, month.atDay(1)))
@@ -141,7 +146,7 @@ class TransactionBudgetAlertServiceTests {
 
     @Test
     void preservesExpenseTotalFailureInsteadOfReturningNoWarning() {
-        YearMonth month = YearMonth.now();
+        YearMonth month = TRANSACTION_MONTH;
         configureCategory(CategoryType.CHI);
         configureBudget(month);
         DataAccessResourceFailureException failure = new DataAccessResourceFailureException("Expense query failed");
@@ -151,26 +156,164 @@ class TransactionBudgetAlertServiceTests {
         assertThatThrownBy(() -> transactionService.createTransaction(transactionDto(), USER_ID)).isSameAs(failure);
     }
 
-    @Test
-    void checksCurrentMonthEvenWhenSubmittedTransactionDateIsInAnotherMonth() {
-        YearMonth currentMonth = YearMonth.now();
+    @ParameterizedTest
+    @ValueSource(strings = {"2023-12", "2024-02", "2031-01", "9999-12"})
+    void usesSubmittedTransactionMonthAndYearInsteadOfServerDate(String value) {
+        YearMonth transactionMonth = YearMonth.parse(value);
         configureCategory(CategoryType.CHI);
-        configureBudget(currentMonth);
-        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, currentMonth))
+        configureBudget(transactionMonth);
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, transactionMonth))
                 .thenReturn(new BigDecimal("110.00"));
         TransactionDTO dto = transactionDto();
-        dto.setOccurredOn(currentMonth.minusMonths(1).atDay(1));
+        dto.setOccurredOn(transactionMonth.atEndOfMonth());
 
         Optional<String> warning = transactionService.createTransaction(dto, USER_ID);
 
         assertThat(warning).isPresent();
-        verify(budgetRepository).findByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, currentMonth.atDay(1));
+        verify(budgetRepository).findByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, transactionMonth.atDay(1));
+        assertThat(warning.orElseThrow()).contains(transactionMonth.toString());
+    }
+
+    @Test
+    void checksUpdatedTotalOnceWhenEditStaysInSameCategoryAndMonth() {
+        configureStoredTransaction();
+        configureCategory(CategoryType.CHI);
+        configureBudget(TRANSACTION_MONTH);
+        configureSuccessfulUpdate(CATEGORY_ID);
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH))
+                .thenReturn(new BigDecimal("100.10"));
+        TransactionDTO dto = transactionDto();
+        dto.setOccurredOn(TRANSACTION_MONTH.atEndOfMonth());
+
+        Optional<String> warning = transactionService.updateTransaction(TRANSACTION_ID, dto, USER_ID);
+
+        assertThat(warning.orElseThrow()).contains("2024-02", "vượt 0.10.");
+        verify(transactionRepository, times(1)).sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"99.99", "100.00"})
+    void clearsWarningWhenUpdatedTotalIsAtOrBelowLimit(String total) {
+        configureStoredTransaction();
+        configureCategory(CategoryType.CHI);
+        configureBudget(TRANSACTION_MONTH);
+        configureSuccessfulUpdate(CATEGORY_ID);
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH))
+                .thenReturn(new BigDecimal(total));
+
+        Optional<String> warning = transactionService.updateTransaction(TRANSACTION_ID, transactionDto(), USER_ID);
+
+        assertThat(warning).isEmpty();
+    }
+
+    @Test
+    void checksBothOldAndNewMonthsWhenTransactionDateChanges() {
+        YearMonth updatedMonth = TRANSACTION_MONTH.plusMonths(1);
+        configureStoredTransaction();
+        configureCategory(CategoryType.CHI);
+        configureBudget(TRANSACTION_MONTH);
+        configureBudget(updatedMonth);
+        configureSuccessfulUpdate(CATEGORY_ID);
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH))
+                .thenReturn(new BigDecimal("110.00"));
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, updatedMonth))
+                .thenReturn(new BigDecimal("130.00"));
+        TransactionDTO dto = transactionDto();
+        dto.setOccurredOn(updatedMonth.atDay(1));
+
+        Optional<String> warning = transactionService.updateTransaction(TRANSACTION_ID, dto, USER_ID);
+
+        assertThat(warning.orElseThrow()).contains("2024-02", "2024-03", "vượt 10.00.", "vượt 30.00.");
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {3L, 11L})
+    void checksBothCategoriesAndLocksInIdOrderWhenCategoryChanges(Long updatedCategoryId) {
+        configureStoredTransaction();
+        configureCategory(CategoryType.CHI);
+        configureBudget(TRANSACTION_MONTH);
+        configureOtherCategoryBudget(updatedCategoryId);
+        configureSuccessfulUpdate(updatedCategoryId);
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH))
+                .thenReturn(new BigDecimal("110.00"));
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, updatedCategoryId, TRANSACTION_MONTH))
+                .thenReturn(new BigDecimal("120.00"));
+        TransactionDTO dto = transactionDto();
+        dto.setCategoryId(updatedCategoryId);
+
+        Optional<String> warning = transactionService.updateTransaction(TRANSACTION_ID, dto, USER_ID);
+
+        assertThat(warning.orElseThrow()).contains("Food", "Other expense", "vượt 10.00.", "vượt 20.00.");
+        InOrder categoryLocks = inOrder(categoryRepository);
+        Long firstId = Math.min(CATEGORY_ID, updatedCategoryId);
+        Long secondId = Math.max(CATEGORY_ID, updatedCategoryId);
+        categoryLocks.verify(categoryRepository).findByIdAndUserIdForUpdate(firstId, USER_ID);
+        categoryLocks.verify(categoryRepository).findByIdAndUserIdForUpdate(secondId, USER_ID);
+    }
+
+    @Test
+    void checksRemainingTotalAfterDeletingUsingOriginalCategoryAndDate() {
+        configureStoredTransaction();
+        configureCategory(CategoryType.CHI);
+        configureBudget(TRANSACTION_MONTH);
+        when(transactionRepository.deleteByIdAndUserId(TRANSACTION_ID, USER_ID)).thenReturn(1);
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH))
+                .thenReturn(new BigDecimal("110.00"));
+
+        Optional<String> warning = transactionService.deleteTransaction(TRANSACTION_ID, USER_ID);
+
+        assertThat(warning.orElseThrow()).contains("2024-02", "vượt 10.00.");
+        InOrder deletionAndCheck = inOrder(transactionRepository);
+        deletionAndCheck.verify(transactionRepository).findByIdAndUserIdForUpdate(TRANSACTION_ID, USER_ID);
+        deletionAndCheck.verify(transactionRepository).deleteByIdAndUserId(TRANSACTION_ID, USER_ID);
+        deletionAndCheck.verify(transactionRepository).sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0.00", "99.99", "100.00"})
+    void doesNotWarnWhenRemainingTotalAfterDeletionIsAtOrBelowLimit(String total) {
+        configureStoredTransaction();
+        configureCategory(CategoryType.CHI);
+        configureBudget(TRANSACTION_MONTH);
+        when(transactionRepository.deleteByIdAndUserId(TRANSACTION_ID, USER_ID)).thenReturn(1);
+        when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH))
+                .thenReturn(new BigDecimal(total));
+
+        Optional<String> warning = transactionService.deleteTransaction(TRANSACTION_ID, USER_ID);
+
+        assertThat(warning).isEmpty();
     }
 
     private void configureCategory(CategoryType type) {
+        Category category = configureLockedCategory(type);
+        when(categoryRepository.findByIdAndUserId(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(category));
+    }
+
+    private Category configureLockedCategory(CategoryType type) {
         Category category = new Category(USER_ID, "Food", type);
         ReflectionTestUtils.setField(category, "id", CATEGORY_ID);
         when(categoryRepository.findByIdAndUserIdForUpdate(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(category));
+        return category;
+    }
+
+    private void configureOtherCategoryBudget(Long categoryId) {
+        Category category = new Category(USER_ID, "Other expense", CategoryType.CHI);
+        when(categoryRepository.findByIdAndUserIdForUpdate(categoryId, USER_ID)).thenReturn(Optional.of(category));
+        when(categoryRepository.findByIdAndUserId(categoryId, USER_ID)).thenReturn(Optional.of(category));
+        Budget budget = new Budget(USER_ID, categoryId, TRANSACTION_MONTH.atDay(1), LIMIT);
+        when(budgetRepository.findByUserIdAndCategoryIdAndMonth(USER_ID, categoryId, TRANSACTION_MONTH.atDay(1)))
+                .thenReturn(Optional.of(budget));
+    }
+
+    private void configureStoredTransaction() {
+        Transaction transaction = new Transaction(USER_ID, CATEGORY_ID, new BigDecimal("0.10"),
+                TRANSACTION_MONTH.atDay(1), null);
+        when(transactionRepository.findByIdAndUserIdForUpdate(TRANSACTION_ID, USER_ID)).thenReturn(Optional.of(transaction));
+    }
+
+    private void configureSuccessfulUpdate(Long categoryId) {
+        when(transactionRepository.updateByIdAndUserId(eq(TRANSACTION_ID), eq(USER_ID), eq(categoryId),
+                any(BigDecimal.class), any(LocalDate.class), any())).thenReturn(1);
     }
 
     private void configureBudget(YearMonth month) {
@@ -183,7 +326,7 @@ class TransactionBudgetAlertServiceTests {
         TransactionDTO dto = new TransactionDTO();
         dto.setCategoryId(CATEGORY_ID);
         dto.setAmount(new BigDecimal("0.10"));
-        dto.setOccurredOn(YearMonth.now().atDay(1));
+        dto.setOccurredOn(TRANSACTION_MONTH.atDay(1));
         return dto;
     }
 }

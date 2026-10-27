@@ -117,9 +117,7 @@ public class TransactionController {
         }
 
         Optional<String> warning = transactionService.createTransaction(dto, userId);
-        if (warning.isPresent()) {
-            FlashMessageUtil.addWarning(redirectAttributes, warning.get());
-        }
+        FlashMessageUtil.addWarningIfPresent(redirectAttributes, warning);
         FlashMessageUtil.addSuccess(redirectAttributes, CREATE_SUCCESS_MESSAGE);
         ModelAndView response = new ModelAndView(LIST_REDIRECT);
         return response;
@@ -154,7 +152,8 @@ public class TransactionController {
             return response;
         }
 
-        transactionService.updateTransaction(transactionId, dto, userId);
+        Optional<String> warning = transactionService.updateTransaction(transactionId, dto, userId);
+        FlashMessageUtil.addWarningIfPresent(redirectAttributes, warning);
         FlashMessageUtil.addSuccess(redirectAttributes, UPDATE_SUCCESS_MESSAGE);
         ModelAndView response = new ModelAndView(DETAIL_REDIRECT + transactionId);
         return response;
@@ -164,7 +163,8 @@ public class TransactionController {
     public String deleteTransaction(@PathVariable("id") @Positive Long transactionId,
             Authentication authentication, RedirectAttributes redirectAttributes) {
         Long userId = currentUserService.getUserId(authentication);
-        transactionService.deleteTransaction(transactionId, userId);
+        Optional<String> warning = transactionService.deleteTransaction(transactionId, userId);
+        FlashMessageUtil.addWarningIfPresent(redirectAttributes, warning);
         FlashMessageUtil.addSuccess(redirectAttributes, DELETE_SUCCESS_MESSAGE);
         return LIST_REDIRECT;
     }

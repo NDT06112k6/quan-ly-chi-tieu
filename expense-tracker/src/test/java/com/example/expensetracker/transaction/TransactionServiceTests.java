@@ -80,6 +80,7 @@ class TransactionServiceTests {
         Long categoryId = 7L;
         TransactionDTO dto = createTransactionDTO(categoryId);
         when(categoryRepository.findByIdAndUserIdForUpdate(categoryId, userId)).thenReturn(Optional.of(category));
+        when(categoryRepository.findByIdAndUserId(categoryId, userId)).thenReturn(Optional.of(category));
         when(category.getId()).thenReturn(categoryId);
 
         transactionService.createTransaction(dto, userId);
@@ -122,6 +123,7 @@ class TransactionServiceTests {
     void rejectsAnotherUserReusingTheOwnersCategory() {
         TransactionDTO dto = createTransactionDTO(CATEGORY_ID);
         when(categoryRepository.findByIdAndUserIdForUpdate(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(category));
+        when(categoryRepository.findByIdAndUserId(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(category));
         when(categoryRepository.findByIdAndUserIdForUpdate(CATEGORY_ID, OTHER_USER_ID)).thenReturn(Optional.empty());
         when(category.getId()).thenReturn(CATEGORY_ID);
 
@@ -398,17 +400,17 @@ class TransactionServiceTests {
     void updatesOnlyTheOwnedTransactionUsingThePathId() {
         TransactionDTO dto = createTransactionDTO(CATEGORY_ID);
         dto.setId(OTHER_USER_ID);
-        when(transactionRepository.findByIdAndUserId(TRANSACTION_ID, USER_ID))
-                .thenReturn(Optional.of(mock(Transaction.class)));
+        Transaction original = new Transaction(USER_ID, CATEGORY_ID, TRANSACTION_AMOUNT, TRANSACTION_DATE, TRANSACTION_NOTE);
+        when(transactionRepository.findByIdAndUserIdForUpdate(TRANSACTION_ID, USER_ID)).thenReturn(Optional.of(original));
+        when(categoryRepository.findByIdAndUserIdForUpdate(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(category));
         when(categoryRepository.findByIdAndUserId(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(category));
-        when(category.getId()).thenReturn(CATEGORY_ID);
         when(transactionRepository.updateByIdAndUserId(
                 TRANSACTION_ID, USER_ID, CATEGORY_ID, TRANSACTION_AMOUNT, TRANSACTION_DATE, TRANSACTION_NOTE))
                 .thenReturn(1);
 
         transactionService.updateTransaction(TRANSACTION_ID, dto, USER_ID);
 
-        verify(transactionRepository).findByIdAndUserId(TRANSACTION_ID, USER_ID);
+        verify(transactionRepository).findByIdAndUserIdForUpdate(TRANSACTION_ID, USER_ID);
         verify(transactionRepository).updateByIdAndUserId(
                 TRANSACTION_ID, USER_ID, CATEGORY_ID, TRANSACTION_AMOUNT, TRANSACTION_DATE, TRANSACTION_NOTE);
         verifyNoMoreInteractions(transactionRepository);
@@ -417,13 +419,13 @@ class TransactionServiceTests {
     @Test
     void rejectsForeignTransactionBeforeUpdatingOrReadingCategory() {
         TransactionDTO dto = createTransactionDTO(CATEGORY_ID);
-        when(transactionRepository.findByIdAndUserId(TRANSACTION_ID, OTHER_USER_ID)).thenReturn(Optional.empty());
+        when(transactionRepository.findByIdAndUserIdForUpdate(TRANSACTION_ID, OTHER_USER_ID)).thenReturn(Optional.empty());
 
         assertThrows(AccessDeniedException.class, () -> {
             transactionService.updateTransaction(TRANSACTION_ID, dto, OTHER_USER_ID);
         });
 
-        verify(transactionRepository).findByIdAndUserId(TRANSACTION_ID, OTHER_USER_ID);
+        verify(transactionRepository).findByIdAndUserIdForUpdate(TRANSACTION_ID, OTHER_USER_ID);
         verifyNoMoreInteractions(transactionRepository);
         verifyNoInteractions(categoryRepository);
     }
@@ -431,26 +433,25 @@ class TransactionServiceTests {
     @Test
     void rejectsUpdatingWithAnotherUsersCategory() {
         TransactionDTO dto = createTransactionDTO(CATEGORY_ID);
-        when(transactionRepository.findByIdAndUserId(TRANSACTION_ID, USER_ID))
-                .thenReturn(Optional.of(mock(Transaction.class)));
-        when(categoryRepository.findByIdAndUserId(CATEGORY_ID, USER_ID)).thenReturn(Optional.empty());
+        Transaction original = new Transaction(USER_ID, CATEGORY_ID, TRANSACTION_AMOUNT, TRANSACTION_DATE, TRANSACTION_NOTE);
+        when(transactionRepository.findByIdAndUserIdForUpdate(TRANSACTION_ID, USER_ID)).thenReturn(Optional.of(original));
+        when(categoryRepository.findByIdAndUserIdForUpdate(CATEGORY_ID, USER_ID)).thenReturn(Optional.empty());
 
         assertThrows(InvalidTransactionCategoryException.class, () -> {
             transactionService.updateTransaction(TRANSACTION_ID, dto, USER_ID);
         });
 
-        verify(transactionRepository).findByIdAndUserId(TRANSACTION_ID, USER_ID);
-        verify(categoryRepository).findByIdAndUserId(CATEGORY_ID, USER_ID);
+        verify(transactionRepository).findByIdAndUserIdForUpdate(TRANSACTION_ID, USER_ID);
+        verify(categoryRepository).findByIdAndUserIdForUpdate(CATEGORY_ID, USER_ID);
         verifyNoMoreInteractions(transactionRepository);
     }
 
     @Test
     void rejectsUpdateWhenTheTransactionDisappearsBeforeTheWrite() {
         TransactionDTO dto = createTransactionDTO(CATEGORY_ID);
-        when(transactionRepository.findByIdAndUserId(TRANSACTION_ID, USER_ID))
-                .thenReturn(Optional.of(mock(Transaction.class)));
-        when(categoryRepository.findByIdAndUserId(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(category));
-        when(category.getId()).thenReturn(CATEGORY_ID);
+        Transaction original = new Transaction(USER_ID, CATEGORY_ID, TRANSACTION_AMOUNT, TRANSACTION_DATE, TRANSACTION_NOTE);
+        when(transactionRepository.findByIdAndUserIdForUpdate(TRANSACTION_ID, USER_ID)).thenReturn(Optional.of(original));
+        when(categoryRepository.findByIdAndUserIdForUpdate(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(category));
         when(transactionRepository.updateByIdAndUserId(
                 TRANSACTION_ID, USER_ID, CATEGORY_ID, TRANSACTION_AMOUNT, TRANSACTION_DATE, TRANSACTION_NOTE))
                 .thenReturn(0);
@@ -462,26 +463,31 @@ class TransactionServiceTests {
 
     @Test
     void deletesOnlyTheTransactionOwnedByTheCurrentUser() {
+        Transaction original = new Transaction(USER_ID, CATEGORY_ID, TRANSACTION_AMOUNT, TRANSACTION_DATE, TRANSACTION_NOTE);
+        when(transactionRepository.findByIdAndUserIdForUpdate(TRANSACTION_ID, USER_ID)).thenReturn(Optional.of(original));
+        when(categoryRepository.findByIdAndUserIdForUpdate(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(category));
+        when(categoryRepository.findByIdAndUserId(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(category));
         when(transactionRepository.deleteByIdAndUserId(TRANSACTION_ID, USER_ID)).thenReturn(1);
 
         transactionService.deleteTransaction(TRANSACTION_ID, USER_ID);
 
+        verify(transactionRepository).findByIdAndUserIdForUpdate(TRANSACTION_ID, USER_ID);
         verify(transactionRepository).deleteByIdAndUserId(TRANSACTION_ID, USER_ID);
         verifyNoMoreInteractions(transactionRepository);
-        verifyNoInteractions(categoryRepository);
     }
 
     @ParameterizedTest
     @ValueSource(longs = {42L, 99L})
     void deniesDeletingMissingOrForeignTransactions(Long userId) {
-        when(transactionRepository.deleteByIdAndUserId(TRANSACTION_ID, userId)).thenReturn(0);
+        when(transactionRepository.findByIdAndUserIdForUpdate(TRANSACTION_ID, userId)).thenReturn(Optional.empty());
 
         assertThrows(AccessDeniedException.class, () -> {
             transactionService.deleteTransaction(TRANSACTION_ID, userId);
         });
 
-        verify(transactionRepository).deleteByIdAndUserId(TRANSACTION_ID, userId);
+        verify(transactionRepository).findByIdAndUserIdForUpdate(TRANSACTION_ID, userId);
         verifyNoMoreInteractions(transactionRepository);
+        verifyNoInteractions(categoryRepository, budgetRepository);
     }
 
     private Pageable createSortedPage(int page, int size) {

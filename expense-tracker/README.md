@@ -268,26 +268,35 @@ concurrent creation and updates. The database unique key also enforces the rule.
 No Maven dependencies or environment variables are added; Hibernate stays in
 `validate` mode.
 
-Creating a `CHI` transaction now checks the category's budget for the server's
-current calendar month after flushing the new transaction. The month follows
-the JVM timezone, as on the dashboard; the submitted transaction date does not
-select the budget month. Only transactions dated within that current month,
-in the same category and belonging to the authenticated user, contribute to
-the expense total. Both the category and budget lookups include the owner ID.
-Category writes are locked during creation so concurrent creates and budget
-changes for the same category serialize before the check.
+Creating, editing and deleting transactions check budgets after the successful
+write. `checkBudgetAlert(userId, categoryId, occurredOn)` derives the reporting
+month and year from `occurredOn`, with no dependency on the server's date or
+timezone. Only `CHI` transactions in that category, owned by the authenticated
+user and dated within that month contribute to the total. The date range
+includes both the first and last day, including December 9999. Budget and
+category lookups also include the authenticated owner ID.
 
-`TransactionService.createTransaction` returns an `Optional<String>` warning.
-Income transactions, categories without a current-month budget, and totals at
-or below the limit return an empty optional. Totals strictly above the limit
-return the category, month, total expense, limit and exceeded amount, calculated
-with `BigDecimal` and displayed with two decimal places. This is an advisory
-warning: the transaction is saved and the controller redirects to `/transactions`
-with both success and warning flash attributes. Actual persistence or budget
-query failures propagate and roll back the operation, without a success flash.
-Editing or deleting transactions does not trigger this creation-only check.
-No dependencies, schema migrations, environment variables or server cache
-changes are required. Refresh open pages to load warning toast support.
+Creation checks the new transaction's period. An edit checks the updated period
+and, when its category or calendar month changes, the original period as well.
+Each distinct category/month is checked once, so changing only the day within
+the same month does not duplicate warnings. Deletion reads and retains the
+original category and date before deleting, then checks the remaining expenses.
+If the remaining total is still over budget it warns; if it is at or below the
+limit there is no warning. Transaction rows are locked before editing/deleting,
+and affected categories are locked in ascending ID order to serialize budget
+checks with concurrent changes.
+
+All three mutation service methods return an `Optional<String>` warning. Income
+categories, categories without a budget for the transaction's month, and totals
+at or below the limit return an empty optional. Totals strictly above the limit
+return the category, month, total, limit and exceeded amount using `BigDecimal`
+with two decimal places. When both affected periods remain over budget, their
+messages are combined. Controllers pass warnings and success flashes to the
+existing SweetAlert2 layout after redirecting. Warnings do not throw exceptions
+or roll back successful changes; actual database/query failures propagate and
+roll back without a success flash. No dependencies, migrations, environment
+variables or server cache changes are required. Refresh open pages to use the
+updated behavior; previously saved transactions participate in the new checks.
 
 ## Dashboard
 

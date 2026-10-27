@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Arrays;
 import java.util.List;
@@ -63,38 +64,38 @@ public class TransactionService {
     @Transactional
     public Optional<String> createTransaction(@Valid @NotNull TransactionDTO dto, @NotNull @Positive Long userId) {
         // Serialize category writes so each budget check sees earlier committed transactions.
-        Category category = categoryRepository.findByIdAndUserIdForUpdate(dto.getCategoryId(), userId)
-                .orElseThrow(InvalidTransactionCategoryException::new);
+        Category category = findOwnedCategoryForUpdate(dto.getCategoryId(), userId);
 
         Transaction transaction = new Transaction(
                 userId, category.getId(), dto.getAmount(), dto.getOccurredOn(), dto.getNote());
         transactionRepository.saveAndFlush(transaction);
-        Optional<String> warning = findBudgetWarning(category, userId);
+        Optional<String> warning = checkBudgetAlert(userId, category.getId(), dto.getOccurredOn());
         return warning;
     }
 
-    private Optional<String> findBudgetWarning(Category category, Long userId) {
+    private Optional<String> checkBudgetAlert(Long userId, Long categoryId, LocalDate occurredOn) {
+        Category category = findOwnedCategory(categoryId, userId);
         Optional<String> warning = Optional.empty();
         if (category.getType() != CategoryType.CHI) {
             return warning;
         }
 
-        YearMonth month = YearMonth.now();
+        YearMonth month = YearMonth.from(occurredOn);
         Optional<Budget> budget = budgetRepository.findByUserIdAndCategoryIdAndMonth(
-                userId, category.getId(), month.atDay(1));
+                userId, categoryId, month.atDay(1));
         if (budget.isEmpty()) {
             return warning;
         }
 
         BigDecimal totalExpense = transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(
-                userId, category.getId(), month).setScale(MONEY_SCALE);
+                userId, categoryId, month).setScale(MONEY_SCALE);
         BigDecimal limitAmount = budget.get().getLimitAmount().setScale(MONEY_SCALE);
         if (totalExpense.compareTo(limitAmount) > 0) {
             BigDecimal exceededAmount = totalExpense.subtract(limitAmount);
             String message = BUDGET_WARNING_MESSAGE.formatted(category.getName(), month,
                     totalExpense.toPlainString(), limitAmount.toPlainString(), exceededAmount.toPlainString());
             warning = Optional.of(message);
-            log.warn("Transaction saved with a budget exceeded warning.");
+            log.warn("Transaction change completed with a budget exceeded warning.");
         }
         return warning;
     }
@@ -117,19 +118,78 @@ public class TransactionService {
     }
 
     @Transactional
-    public void updateTransaction(@NotNull @Positive Long transactionId, @Valid @NotNull TransactionDTO dto,
+    public Optional<String> updateTransaction(@NotNull @Positive Long transactionId, @Valid @NotNull TransactionDTO dto,
             @NotNull @Positive Long userId) {
-        findOwnedTransaction(transactionId, userId);
-        Category category = findOwnedCategory(dto.getCategoryId(), userId);
+        Transaction original = findOwnedTransactionForUpdate(transactionId, userId);
+        lockAffectedCategories(userId, original.getCategoryId(), dto.getCategoryId());
         int updatedRows = transactionRepository.updateByIdAndUserId(
-                transactionId, userId, category.getId(), dto.getAmount(), dto.getOccurredOn(), dto.getNote());
+                transactionId, userId, dto.getCategoryId(), dto.getAmount(), dto.getOccurredOn(), dto.getNote());
         requireSuccessfulWrite(updatedRows);
+        Optional<String> warning = checkBudgetAlert(userId, dto.getCategoryId(), dto.getOccurredOn());
+        if (!isSameBudgetPeriod(original, dto)) {
+            Optional<String> previousWarning = checkBudgetAlert(userId, original.getCategoryId(), original.getOccurredOn());
+            warning = combineWarnings(warning, previousWarning);
+        }
+        return warning;
     }
 
     @Transactional
-    public void deleteTransaction(@NotNull @Positive Long transactionId, @NotNull @Positive Long userId) {
+    public Optional<String> deleteTransaction(@NotNull @Positive Long transactionId, @NotNull @Positive Long userId) {
+        Transaction transaction = findOwnedTransactionForUpdate(transactionId, userId);
+        Long categoryId = transaction.getCategoryId();
+        LocalDate occurredOn = transaction.getOccurredOn();
+        findOwnedCategoryForUpdate(categoryId, userId);
         int deletedRows = transactionRepository.deleteByIdAndUserId(transactionId, userId);
         requireSuccessfulWrite(deletedRows);
+        Optional<String> warning = checkBudgetAlert(userId, categoryId, occurredOn);
+        return warning;
+    }
+
+    private void lockAffectedCategories(Long userId, Long originalCategoryId, Long updatedCategoryId) {
+        Long firstCategoryId = originalCategoryId;
+        Long secondCategoryId = updatedCategoryId;
+        if (originalCategoryId.compareTo(updatedCategoryId) > 0) {
+            firstCategoryId = updatedCategoryId;
+            secondCategoryId = originalCategoryId;
+        }
+
+        // A consistent lock order prevents opposite category moves from deadlocking.
+        findOwnedCategoryForUpdate(firstCategoryId, userId);
+        if (!firstCategoryId.equals(secondCategoryId)) {
+            findOwnedCategoryForUpdate(secondCategoryId, userId);
+        }
+    }
+
+    private boolean isSameBudgetPeriod(Transaction original, TransactionDTO updated) {
+        boolean sameCategory = original.getCategoryId().equals(updated.getCategoryId());
+        boolean sameMonth = YearMonth.from(original.getOccurredOn()).equals(YearMonth.from(updated.getOccurredOn()));
+        boolean samePeriod = sameCategory && sameMonth;
+        return samePeriod;
+    }
+
+    private Optional<String> combineWarnings(Optional<String> warning, Optional<String> previousWarning) {
+        if (warning.isEmpty()) {
+            return previousWarning;
+        }
+        if (previousWarning.isEmpty()) {
+            return warning;
+        }
+
+        String message = String.join(System.lineSeparator(), warning.get(), previousWarning.get());
+        Optional<String> combinedWarning = Optional.of(message);
+        return combinedWarning;
+    }
+
+    private Transaction findOwnedTransactionForUpdate(Long transactionId, Long userId) {
+        Transaction transaction = transactionRepository.findByIdAndUserIdForUpdate(transactionId, userId)
+                .orElseThrow(() -> new AccessDeniedException(TRANSACTION_ACCESS_DENIED));
+        return transaction;
+    }
+
+    private Category findOwnedCategoryForUpdate(Long categoryId, Long userId) {
+        Category category = categoryRepository.findByIdAndUserIdForUpdate(categoryId, userId)
+                .orElseThrow(InvalidTransactionCategoryException::new);
+        return category;
     }
 
     private Transaction findOwnedTransaction(Long transactionId, Long userId) {
