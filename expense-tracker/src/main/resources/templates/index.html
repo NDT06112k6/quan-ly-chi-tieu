@@ -17,7 +17,7 @@
                         <span class="summary-symbol text-success" aria-hidden="true">↙</span>
                         <h2 class="h6 text-body-secondary mb-3">Tổng thu</h2>
                         <p class="fs-2 fw-semibold text-success text-break mb-2" id="total-income"
-                           th:text="${dashboard.totalIncome.toPlainString()}"></p>
+                           th:text="${vnCurrency.format(dashboard.totalIncome)}"></p>
                         <p class="summary-caption mb-0">Thu nhập trong tháng</p>
                     </div>
                 </article>
@@ -28,7 +28,7 @@
                         <span class="summary-symbol text-danger" aria-hidden="true">↗</span>
                         <h2 class="h6 text-body-secondary mb-3">Tổng chi</h2>
                         <p class="fs-2 fw-semibold text-danger text-break mb-2" id="total-expense"
-                           th:text="${dashboard.totalExpense.toPlainString()}"></p>
+                           th:text="${vnCurrency.format(dashboard.totalExpense)}"></p>
                         <p class="summary-caption mb-0">Chi tiêu trong tháng</p>
                     </div>
                 </article>
@@ -40,7 +40,7 @@
                         <h2 class="h6 mb-3">Số dư</h2>
                         <p class="fs-2 fw-semibold text-break mb-2" id="balance"
                            th:classappend="${dashboard.balance.signum() < 0 ? 'text-danger' : 'text-primary'}"
-                           th:text="${dashboard.balance.toPlainString()}"></p>
+                           th:text="${vnCurrency.format(dashboard.balance)}"></p>
                         <p class="summary-caption mb-0">Tổng thu trừ tổng chi</p>
                     </div>
                 </article>

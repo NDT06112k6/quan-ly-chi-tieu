@@ -35,6 +35,17 @@ protection remains enabled, including for login, registration and logout forms.
 accounts receive role `USER` and are enabled. Roles and account status are
 never bound from the registration form.
 
+After saving a new account, registration creates six categories owned by its
+generated user ID: `CHI` categories `Ăn uống`, `Đi lại`, `Mua sắm`, `Hóa đơn`, and
+`THU` categories `Lương`, `Thu nhập khác`. Each account receives separate category
+rows. `UserService.registerUser` saves and flushes both the account and its
+categories in the same transaction. If any insert or flush fails, the entire
+registration rolls back, including any categories already inserted; the error
+is propagated without a success notification. Duplicate or invalid registrations
+do not initialize categories. This applies to new registrations only; existing
+accounts are not backfilled. No schema migration, dependencies, environment
+variables or cache changes are required.
+
 Validation and business errors are rendered with `th:errors`. The registration
 advice also handles concurrent duplicate email inserts using the existing
 `uk_users_email` constraint; unrelated database failures remain errors.
@@ -136,7 +147,7 @@ list to load the new controls.
 
 Each transaction row includes an eye icon and a link to
 `GET /transactions/{id}`. The detail page uses the master layout and displays
-the exact `BigDecimal` amount, date, category name and escaped note. Amounts
+the amount formatted in dong, date, category name and escaped note. Amounts
 are red for category type `CHI` and green for `THU`; the type is also shown
 as text. The service reads the transaction with `findByIdAndUserId` and resolves
 the category with the same owner ID. Missing and foreign transactions both
@@ -311,8 +322,9 @@ The repository aggregates `THU` and `CHI` separately by transaction date,
 filtering both transactions and joined categories by the same user ID. A month
 with no matching transactions totals zero through SQL `COALESCE`; database
 failures are not converted to zeros. The service uses a read-only transaction
-for the two sums and `BigDecimal` subtraction for the balance. All displayed
-totals retain two decimal places, including zero and negative balances.
+for the two sums and `BigDecimal` subtraction for the balance. Stored totals
+retain two decimal places; the HTML displays whole dong with comma grouping
+and a `₫` suffix, including zero and negative balances.
 The Bootstrap cards stack on small screens. No new dependencies, schema
 migrations, environment variables or cache resets are required.
 
@@ -359,6 +371,22 @@ No database migrations, dependencies, environment variables or server cache rese
 are required. Refresh open pages to load the new error template when an error occurs.
 
 ## Interface
+
+`CurrencyModelAdvice` makes a shared `VietnameseCurrencyFormatter` available
+as `vnCurrency` in Thymeleaf views. Use
+`th:text="${vnCurrency.format(amount)}"` for monetary text. It delegates to
+Thymeleaf's `Numbers.formatDecimal(amount, 1, "COMMA", 0, "POINT")` and appends
+` ₫`, for example `50,000 ₫`. Dashboard totals, transaction lists/details and
+budget limits all use this helper. Explicit separators make the format
+independent of the browser's requested locale. Missing monetary values remain
+errors instead of being displayed as zero.
+
+This is display rounding only: amounts remain `BigDecimal`, forms retain
+their decimal number values, and CSV/API data retain their original precision.
+The chart tooltip uses the same grouping, suffix and half-even rounding.
+Refresh open pages to load the updated templates and chart script. No new
+dependencies, database migrations, environment variables or server cache
+changes are required.
 
 All pages use the shared Thymeleaf fragment
 `templates/layout/main-layout.html :: layout(pageTitle, activePage, content)`.

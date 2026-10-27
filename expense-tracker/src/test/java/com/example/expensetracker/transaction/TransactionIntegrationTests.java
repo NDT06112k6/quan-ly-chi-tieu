@@ -162,9 +162,23 @@ class TransactionIntegrationTests {
         mockMvc.perform(get("/transactions").with(user(owner.getEmail())))
                 .andExpect(status().isOk())
                 .andExpect(content().string(matchesPattern(
-                        "(?s).*<td[^>]*>My category</td>\\s*<td[^>]*class=\"[^\"]*text-danger[^\"]*\"[^>]*>10\\.00</td>.*")))
+                        "(?s).*<td[^>]*>My category</td>\\s*<td[^>]*class=\"[^\"]*text-danger[^\"]*\"[^>]*>10 ₫</td>.*")))
                 .andExpect(content().string(matchesPattern(
-                        "(?s).*<td[^>]*>Salary</td>\\s*<td[^>]*class=\"[^\"]*text-success[^\"]*\"[^>]*>10\\.00</td>.*")));
+                        "(?s).*<td[^>]*>Salary</td>\\s*<td[^>]*class=\"[^\"]*text-success[^\"]*\"[^>]*>10 ₫</td>.*")));
+    }
+
+    @Test
+    void displaysGroupedCurrencyWhilePreservingTransactionAmount() throws Exception {
+        Transaction transaction = new Transaction(owner.getId(), ownerCategory.getId(),
+                new BigDecimal("50000.75"), LocalDate.of(2026, 10, 1), "Grouped currency");
+        entityManager.persist(transaction);
+        entityManager.flush();
+
+        mockMvc.perform(get("/transactions").with(user(owner.getEmail())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("50,001 ₫")));
+
+        assertThat(transaction.getAmount()).isEqualByComparingTo("50000.75");
     }
 
     @Test

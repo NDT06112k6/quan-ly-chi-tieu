@@ -23,7 +23,7 @@
                             <td class="text-nowrap" th:text="${budget.month}"></td>
                             <td class="text-break" th:text="${categoryNames[budget.categoryId]}"></td>
                             <td class="text-end text-nowrap font-monospace fw-semibold"
-                                th:text="${budget.limitAmount.toPlainString()}"></td>
+                                th:text="${vnCurrency.format(budget.limitAmount)}"></td>
                         </tr>
                         </tbody>
                     </table>

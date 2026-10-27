@@ -1,5 +1,6 @@
 package com.example.expensetracker.user;
 
+import com.example.expensetracker.category.CategoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,11 +28,13 @@ class UserPasswordChangeServiceTests {
     private UserRepository userRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
+    @Mock
+    private CategoryRepository categoryRepository;
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, passwordEncoder);
+        userService = new UserService(userRepository, passwordEncoder, categoryRepository);
         User user = new User(EMAIL, OLD_HASH, "User");
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
     }

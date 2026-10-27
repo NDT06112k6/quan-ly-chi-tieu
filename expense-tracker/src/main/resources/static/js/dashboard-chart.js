@@ -68,8 +68,12 @@ function formatExpenseTooltip(context) {
         total += amount;
     }
     const percentage = ((context.parsed / total) * PERCENT_SCALE).toFixed(1);
-    const amount = context.parsed.toLocaleString("vi-VN", { minimumFractionDigits: 2 });
-    const label = `${context.label}: ${amount} (${percentage}%)`;
+    const amount = context.parsed.toLocaleString("en-US", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+        roundingMode: "halfEven"
+    });
+    const label = `${context.label}: ${amount} ₫ (${percentage}%)`;
     return label;
 }
 

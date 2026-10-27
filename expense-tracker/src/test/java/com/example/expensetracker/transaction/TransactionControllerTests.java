@@ -115,7 +115,7 @@ class TransactionControllerTests {
                 .andReturn();
 
         String html = result.getResponse().getContentAsString();
-        assertThat(html).contains("Chi tiết giao dịch", "123.45", "2026-10-25", "Food", "Lunch", "id=\"app-sidebar\"");
+        assertThat(html).contains("Chi tiết giao dịch", "123 ₫", "2026-10-25", "Food", "Lunch", "id=\"app-sidebar\"");
         assertThat(html).containsPattern("class=\"[^\"]*fw-bold[^\"]*" + color + "[^\"]*\" id=\"transaction-amount\"");
         assertThat(html).contains("href=\"/transactions\"", "href=\"" + EDIT_PATH + "\"",
                 "method=\"post\" action=\"" + DELETE_PATH + "\"", "name=\"_csrf\"");
@@ -148,7 +148,7 @@ class TransactionControllerTests {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        assertThat(result.getResponse().getContentAsString()).contains("Không có ghi chú.", "123.45");
+        assertThat(result.getResponse().getContentAsString()).contains("Không có ghi chú.", "123 ₫");
     }
 
     @ParameterizedTest

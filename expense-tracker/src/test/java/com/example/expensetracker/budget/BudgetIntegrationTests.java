@@ -131,6 +131,20 @@ class BudgetIntegrationTests {
     }
 
     @Test
+    void displaysBudgetLimitAsGroupedDongWithoutChangingItsValue() throws Exception {
+        Budget budget = new Budget(owner.getId(), ownerCategory.getId(),
+                LocalDate.of(2026, 10, 1), new BigDecimal("1250000.75"));
+        entityManager.persist(budget);
+        entityManager.flush();
+
+        mockMvc.perform(get("/budgets").with(user(owner.getEmail())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("1,250,001 ₫")));
+
+        assertThat(budget.getLimitAmount()).isEqualByComparingTo("1250000.75");
+    }
+
+    @Test
     void rejectsForeignCategoryWithoutChangingForeignBudget() throws Exception {
         Budget foreignBudget = new Budget(otherUser.getId(), otherCategory.getId(),
                 LocalDate.of(2026, 10, 1), new BigDecimal("10.00"));

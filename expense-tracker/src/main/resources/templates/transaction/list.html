@@ -69,7 +69,7 @@
                             <td th:text="${categoryNames[transaction.categoryId]}"></td>
                             <td class="text-end text-nowrap font-monospace fw-semibold"
                                 th:classappend="${categoryTypes[transaction.categoryId] == 'CHI' ? 'text-danger' : 'text-success'}"
-                                th:text="${transaction.amount.toPlainString()}"></td>
+                                th:text="${vnCurrency.format(transaction.amount)}"></td>
                             <td th:text="${transaction.note}"></td>
                             <td class="text-end text-nowrap">
                                 <a class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"

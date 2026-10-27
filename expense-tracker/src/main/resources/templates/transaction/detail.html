@@ -14,7 +14,7 @@
                     <h2 class="h6 text-body-secondary mb-3">Số tiền</h2>
                     <p class="fs-2 fw-bold text-break mb-0" id="transaction-amount"
                        th:classappend="${transaction.expense ? 'text-danger' : 'text-success'}"
-                       th:text="${transaction.amount.toPlainString()}"></p>
+                       th:text="${vnCurrency.format(transaction.amount)}"></p>
                 </div>
                 <dl class="row gy-3 mb-4">
                     <dt class="col-sm-4 text-body-secondary">Ngày giao dịch</dt>

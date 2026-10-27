@@ -79,6 +79,20 @@ test("shows an empty month only after a successful empty API response", async ()
     assert.equal(dashboard.retry.hidden, true);
 });
 
+test("tooltips format dong with comma grouping and no decimal digits without changing chart data", async () => {
+    const amount = 1250000.75;
+    const dashboard = createDashboard([chartResponse([{ categoryName: "Ăn uống", totalAmount: amount }])]);
+    await dashboard.ready;
+    const configuration = dashboard.charts[0].configuration;
+    const tooltip = configuration.options.plugins.tooltip.callbacks.label;
+    const label = tooltip({ dataset: configuration.data.datasets[0], parsed: amount, label: "Ăn uống" });
+
+    assert.equal(label, "Ăn uống: 1,250,001 ₫ (100.0%)");
+    assert.equal(configuration.data.datasets[0].data[0], amount);
+    assert.equal(tooltip({ dataset: { data: [50000.50] }, parsed: 50000.50, label: "Tie" }),
+        "Tie: 50,000 ₫ (100.0%)");
+});
+
 test("a later page failure does not draw partial data and retry starts with the first page", async () => {
     const responses = [
         chartResponse([{ categoryName: "Partial result", totalAmount: 10 }], true),

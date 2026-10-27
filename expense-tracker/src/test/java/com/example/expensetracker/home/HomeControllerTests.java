@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Locale;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
@@ -79,5 +80,22 @@ class HomeControllerTests {
                 .andExpect(content().string(containsString("Đăng xuất")));
 
         verify(transactionService).getDashboardData(userId, currentDate.getMonthValue(), currentDate.getYear());
+    }
+
+    @Test
+    void formatsAllDashboardTotalsIncludingNegativeBalanceRegardlessOfRequestLocale() throws Exception {
+        LocalDate today = LocalDate.now();
+        Long userId = 42L;
+        DashboardDTO dashboard = new DashboardDTO(
+                new BigDecimal("50000.00"), new BigDecimal("1250000.75"), new BigDecimal("-1200000.75"));
+        when(currentUserService.getUserId(any(Authentication.class))).thenReturn(userId);
+        when(transactionService.getDashboardData(userId, today.getMonthValue(), today.getYear()))
+                .thenReturn(dashboard);
+
+        mockMvc.perform(get("/").with(user("home-test@example.invalid")).locale(Locale.GERMANY))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("50,000 ₫")))
+                .andExpect(content().string(containsString("1,250,001 ₫")))
+                .andExpect(content().string(containsString("-1,200,001 ₫")));
     }
 }

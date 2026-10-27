@@ -1,5 +1,8 @@
 package com.example.expensetracker.user;
 
+import com.example.expensetracker.category.Category;
+import com.example.expensetracker.category.CategoryRepository;
+import com.example.expensetracker.category.CategoryType;
 import com.example.expensetracker.common.util.PasswordUtil;
 import com.example.expensetracker.common.util.UserAccessUtil;
 import jakarta.validation.constraints.Email;
@@ -10,19 +13,26 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Service
 @Validated
 public class UserService {
 
     private static final String DEFAULT_ROLE = "USER";
     private static final int EXPECTED_UPDATE_COUNT = 1;
+    private static final List<String> DEFAULT_EXPENSE_CATEGORY_NAMES = List.of("Ăn uống", "Đi lại", "Mua sắm", "Hóa đơn");
+    private static final List<String> DEFAULT_INCOME_CATEGORY_NAMES = List.of("Lương", "Thu nhập khác");
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final CategoryRepository categoryRepository;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, CategoryRepository categoryRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.categoryRepository = categoryRepository;
     }
 
     @Transactional
@@ -38,7 +48,24 @@ public class UserService {
         User user = new User(email, passwordHash, displayName);
         user.setRole(DEFAULT_ROLE);
         user.setEnabled(true);
-        userRepository.saveAndFlush(user);
+        User registeredUser = userRepository.saveAndFlush(user);
+        initializeDefaultCategories(registeredUser.getId());
+    }
+
+    private void initializeDefaultCategories(Long userId) {
+        List<Category> categories = createCategories(userId, CategoryType.CHI, DEFAULT_EXPENSE_CATEGORY_NAMES);
+        List<Category> incomeCategories = createCategories(userId, CategoryType.THU, DEFAULT_INCOME_CATEGORY_NAMES);
+        categories.addAll(incomeCategories);
+        categoryRepository.saveAllAndFlush(categories);
+    }
+
+    private List<Category> createCategories(Long userId, CategoryType type, List<String> names) {
+        List<Category> categories = new ArrayList<>();
+        for (String name : names) {
+            Category category = new Category(userId, name, type);
+            categories.add(category);
+        }
+        return categories;
     }
 
     @Transactional(readOnly = true)
