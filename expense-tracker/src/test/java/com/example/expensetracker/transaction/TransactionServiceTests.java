@@ -1,5 +1,6 @@
 package com.example.expensetracker.transaction;
 
+import com.example.expensetracker.budget.BudgetRepository;
 import com.example.expensetracker.category.Category;
 import com.example.expensetracker.category.CategoryRepository;
 import com.example.expensetracker.category.CategoryType;
@@ -65,6 +66,9 @@ class TransactionServiceTests {
     private CategoryRepository categoryRepository;
 
     @Mock
+    private BudgetRepository budgetRepository;
+
+    @Mock
     private Category category;
 
     @InjectMocks
@@ -75,7 +79,7 @@ class TransactionServiceTests {
         Long userId = 42L;
         Long categoryId = 7L;
         TransactionDTO dto = createTransactionDTO(categoryId);
-        when(categoryRepository.findByIdAndUserId(categoryId, userId)).thenReturn(Optional.of(category));
+        when(categoryRepository.findByIdAndUserIdForUpdate(categoryId, userId)).thenReturn(Optional.of(category));
         when(category.getId()).thenReturn(categoryId);
 
         transactionService.createTransaction(dto, userId);
@@ -88,7 +92,7 @@ class TransactionServiceTests {
         assertEquals(dto.getAmount(), savedTransaction.getAmount());
         assertEquals(dto.getOccurredOn(), savedTransaction.getOccurredOn());
         assertEquals(dto.getNote(), savedTransaction.getNote());
-        verify(categoryRepository).findByIdAndUserId(categoryId, userId);
+        verify(categoryRepository).findByIdAndUserIdForUpdate(categoryId, userId);
     }
 
     @Test
@@ -104,21 +108,21 @@ class TransactionServiceTests {
         Long userId = 42L;
         Long categoryId = 7L;
         TransactionDTO dto = createTransactionDTO(categoryId);
-        when(categoryRepository.findByIdAndUserId(categoryId, userId)).thenReturn(Optional.empty());
+        when(categoryRepository.findByIdAndUserIdForUpdate(categoryId, userId)).thenReturn(Optional.empty());
 
         assertThrows(InvalidTransactionCategoryException.class, () -> {
             transactionService.createTransaction(dto, userId);
         });
 
-        verify(categoryRepository).findByIdAndUserId(categoryId, userId);
+        verify(categoryRepository).findByIdAndUserIdForUpdate(categoryId, userId);
         verifyNoInteractions(transactionRepository);
     }
 
     @Test
     void rejectsAnotherUserReusingTheOwnersCategory() {
         TransactionDTO dto = createTransactionDTO(CATEGORY_ID);
-        when(categoryRepository.findByIdAndUserId(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(category));
-        when(categoryRepository.findByIdAndUserId(CATEGORY_ID, OTHER_USER_ID)).thenReturn(Optional.empty());
+        when(categoryRepository.findByIdAndUserIdForUpdate(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(category));
+        when(categoryRepository.findByIdAndUserIdForUpdate(CATEGORY_ID, OTHER_USER_ID)).thenReturn(Optional.empty());
         when(category.getId()).thenReturn(CATEGORY_ID);
 
         transactionService.createTransaction(dto, USER_ID);
@@ -129,8 +133,8 @@ class TransactionServiceTests {
         ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
         verify(transactionRepository, times(1)).saveAndFlush(transactionCaptor.capture());
         assertEquals(USER_ID, transactionCaptor.getValue().getUserId());
-        verify(categoryRepository).findByIdAndUserId(CATEGORY_ID, USER_ID);
-        verify(categoryRepository).findByIdAndUserId(CATEGORY_ID, OTHER_USER_ID);
+        verify(categoryRepository).findByIdAndUserIdForUpdate(CATEGORY_ID, USER_ID);
+        verify(categoryRepository).findByIdAndUserIdForUpdate(CATEGORY_ID, OTHER_USER_ID);
         verifyNoMoreInteractions(transactionRepository);
     }
 
@@ -138,7 +142,7 @@ class TransactionServiceTests {
     void propagatesTransactionPersistenceFailure() {
         TransactionDTO dto = createTransactionDTO(CATEGORY_ID);
         DataAccessResourceFailureException failure = new DataAccessResourceFailureException("Test database failure");
-        when(categoryRepository.findByIdAndUserId(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(category));
+        when(categoryRepository.findByIdAndUserIdForUpdate(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(category));
         when(category.getId()).thenReturn(CATEGORY_ID);
         when(transactionRepository.saveAndFlush(any(Transaction.class))).thenThrow(failure);
 

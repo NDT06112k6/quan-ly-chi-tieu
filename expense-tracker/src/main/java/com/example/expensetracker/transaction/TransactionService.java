@@ -1,7 +1,10 @@
 package com.example.expensetracker.transaction;
 
+import com.example.expensetracker.budget.Budget;
+import com.example.expensetracker.budget.BudgetRepository;
 import com.example.expensetracker.category.Category;
 import com.example.expensetracker.category.CategoryRepository;
+import com.example.expensetracker.category.CategoryType;
 import com.example.expensetracker.home.DashboardDTO;
 import com.example.expensetracker.home.CategoryExpenseDTO;
 import com.example.expensetracker.common.util.CsvUtil;
@@ -10,6 +13,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -24,12 +29,14 @@ import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @Validated
 @Transactional(readOnly = true)
 public class TransactionService {
 
+    private static final Logger log = LoggerFactory.getLogger(TransactionService.class);
     public static final int DEFAULT_PAGE_SIZE = 20;
     public static final int MAX_PAGE_SIZE = 100;
     private static final String DATE_SORT_PROPERTY = "occurredOn";
@@ -38,23 +45,58 @@ public class TransactionService {
     private static final int EXPECTED_WRITE_COUNT = 1;
     private static final String TRANSACTION_ACCESS_DENIED = "Không thể truy cập giao dịch này.";
     private static final String UTF8_BOM = "\uFEFF";
+    private static final String BUDGET_WARNING_MESSAGE =
+            "Danh mục \"%s\" đã vượt ngân sách tháng %s: tổng chi %s, hạn mức %s, vượt %s.";
     private static final List<String> CSV_HEADER = List.of("Ngày", "Danh mục", "Số tiền", "Ghi chú");
 
     private final TransactionRepository transactionRepository;
     private final CategoryRepository categoryRepository;
+    private final BudgetRepository budgetRepository;
 
-    public TransactionService(TransactionRepository transactionRepository, CategoryRepository categoryRepository) {
+    public TransactionService(TransactionRepository transactionRepository, CategoryRepository categoryRepository,
+            BudgetRepository budgetRepository) {
         this.transactionRepository = transactionRepository;
         this.categoryRepository = categoryRepository;
+        this.budgetRepository = budgetRepository;
     }
 
     @Transactional
-    public void createTransaction(@Valid @NotNull TransactionDTO dto, @NotNull @Positive Long userId) {
-        Category category = findOwnedCategory(dto.getCategoryId(), userId);
+    public Optional<String> createTransaction(@Valid @NotNull TransactionDTO dto, @NotNull @Positive Long userId) {
+        // Serialize category writes so each budget check sees earlier committed transactions.
+        Category category = categoryRepository.findByIdAndUserIdForUpdate(dto.getCategoryId(), userId)
+                .orElseThrow(InvalidTransactionCategoryException::new);
 
         Transaction transaction = new Transaction(
                 userId, category.getId(), dto.getAmount(), dto.getOccurredOn(), dto.getNote());
         transactionRepository.saveAndFlush(transaction);
+        Optional<String> warning = findBudgetWarning(category, userId);
+        return warning;
+    }
+
+    private Optional<String> findBudgetWarning(Category category, Long userId) {
+        Optional<String> warning = Optional.empty();
+        if (category.getType() != CategoryType.CHI) {
+            return warning;
+        }
+
+        YearMonth month = YearMonth.now();
+        Optional<Budget> budget = budgetRepository.findByUserIdAndCategoryIdAndMonth(
+                userId, category.getId(), month.atDay(1));
+        if (budget.isEmpty()) {
+            return warning;
+        }
+
+        BigDecimal totalExpense = transactionRepository.sumExpensesByUserIdAndCategoryIdAndMonth(
+                userId, category.getId(), month).setScale(MONEY_SCALE);
+        BigDecimal limitAmount = budget.get().getLimitAmount().setScale(MONEY_SCALE);
+        if (totalExpense.compareTo(limitAmount) > 0) {
+            BigDecimal exceededAmount = totalExpense.subtract(limitAmount);
+            String message = BUDGET_WARNING_MESSAGE.formatted(category.getName(), month,
+                    totalExpense.toPlainString(), limitAmount.toPlainString(), exceededAmount.toPlainString());
+            warning = Optional.of(message);
+            log.warn("Transaction saved with a budget exceeded warning.");
+        }
+        return warning;
     }
 
     public TransactionDetailDTO getTransactionDetail(@NotNull @Positive Long transactionId,

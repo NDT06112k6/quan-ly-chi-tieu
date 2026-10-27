@@ -111,6 +111,27 @@ The legacy `findAllByUserId` remains available for existing callers. Use the
 paginated overloads for web lists. No schema, dependencies, environment
 variables or cache settings change.
 
+Categories can be edited at `GET /categories/{id}/edit` and saved with
+`POST /categories/{id}/edit`. The shared creation/edit form validates the name
+and type, retains its edit action on invalid input (HTTP 400), and ignores
+submitted IDs and ownership. The path selects the category; the authenticated
+account supplies the owner. Missing or foreign categories return HTTP 403,
+including invalid edit submissions. Updates use `updateByIdAndUserId` and must
+affect exactly one row. Changing `CHI` to `THU` or vice versa changes how existing
+transactions in that category contribute to dashboard totals and charts.
+
+The list includes edit links and CSRF-protected forms posting to
+`POST /categories/{id}/delete`. GET requests cannot delete categories. Deletion
+locks the owned category, counts its transactions with both category ID and
+user ID, and checks for budgets before executing the user-scoped delete query.
+Categories referenced by transactions or budgets remain unchanged and raise
+`CategoryInUseException`. `GlobalExceptionHandler` redirects to `/categories`
+with an error flash displayed by the existing SweetAlert2 toast. Successful
+edits and deletions use success flashes; other failures remain errors. No related
+transactions or budgets are deleted. No dependencies, schema migrations,
+environment variables or server cache changes are required. Refresh the category
+list to load the new controls.
+
 ## Transactions
 
 Each transaction row includes an eye icon and a link to
@@ -247,6 +268,27 @@ concurrent creation and updates. The database unique key also enforces the rule.
 No Maven dependencies or environment variables are added; Hibernate stays in
 `validate` mode.
 
+Creating a `CHI` transaction now checks the category's budget for the server's
+current calendar month after flushing the new transaction. The month follows
+the JVM timezone, as on the dashboard; the submitted transaction date does not
+select the budget month. Only transactions dated within that current month,
+in the same category and belonging to the authenticated user, contribute to
+the expense total. Both the category and budget lookups include the owner ID.
+Category writes are locked during creation so concurrent creates and budget
+changes for the same category serialize before the check.
+
+`TransactionService.createTransaction` returns an `Optional<String>` warning.
+Income transactions, categories without a current-month budget, and totals at
+or below the limit return an empty optional. Totals strictly above the limit
+return the category, month, total expense, limit and exceeded amount, calculated
+with `BigDecimal` and displayed with two decimal places. This is an advisory
+warning: the transaction is saved and the controller redirects to `/transactions`
+with both success and warning flash attributes. Actual persistence or budget
+query failures propagate and roll back the operation, without a success flash.
+Editing or deleting transactions does not trigger this creation-only check.
+No dependencies, schema migrations, environment variables or server cache
+changes are required. Refresh open pages to load warning toast support.
+
 ## Dashboard
 
 `GET /` displays total income, total expense and balance for the authenticated
@@ -357,7 +399,7 @@ Flash text is consumed on the next matching request and is absent after a
 refresh. Validation failures keep their form and field errors; failed service
 calls retain existing exception handling and never add a success flash.
 
-The layout uses `th:if` to support `success` and string-valued `error` flash
+The layout uses `th:if` to support `success`, string-valued `warning` and `error` flash
 attributes, plus `?success=message` and `?error=message` URL parameters. Empty
 URL flags have friendly defaults, including the existing login, password-change
 and `?logout` notifications. Flash text takes priority over URL text of the same
@@ -367,6 +409,8 @@ refresh; use flash attributes for notifications following application actions.
 Messages are escaped with `th:text` and passed to SweetAlert2 as `titleText`,
 never HTML or executable inline JavaScript. Structured error-page DTOs are not
 treated as error flash text. Browsers need access to the SweetAlert2 CDN.
+Budget alerts use SweetAlert2's yellow `warning` icon and appear before the
+success toast. Warning flashes are consumed once and disappear after refresh.
 Refresh open pages to load the shared script; no Maven/npm dependencies,
 database migrations, environment variables or server cache resets are added.
 

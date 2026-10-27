@@ -37,6 +37,8 @@ public interface BudgetRepository extends JpaRepository<Budget, Long> {
 
     boolean existsByIdAndUserId(Long id, Long userId);
 
+    boolean existsByCategoryIdAndUserId(Long categoryId, Long userId);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
     @Query("""

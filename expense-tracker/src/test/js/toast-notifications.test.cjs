@@ -26,7 +26,8 @@ test("pages without notifications do not invoke SweetAlert2", async () => {
 test("notifications use nonblocking top-right toasts with a three-second timer and plain text", async () => {
     const messages = [
         { dataset: { toastIcon: "success" }, textContent: "Saved successfully" },
-        { dataset: { toastIcon: "error" }, textContent: "<img src=x onerror=alert(1)>" }
+        { dataset: { toastIcon: "error" }, textContent: "<img src=x onerror=alert(1)>" },
+        { dataset: { toastIcon: "warning" }, textContent: "Budget exceeded by 0.10" }
     ];
     let configuration;
     const displayed = [];
@@ -48,12 +49,14 @@ test("notifications use nonblocking top-right toasts with a three-second timer a
     assert.equal(configuration.showConfirmButton, false);
     assert.equal(configuration.backdrop, false);
     assert.equal(configuration.heightAuto, false);
-    assert.equal(displayed.length, 2);
+    assert.equal(displayed.length, 3);
     assert.equal(displayed[0].icon, "success");
     assert.equal(displayed[1].icon, "error");
     assert.equal(displayed[1].titleText, messages[1].textContent);
     assert.equal(displayed[1].html, undefined);
     assert.equal(displayed[1].title, undefined);
+    assert.equal(displayed[2].icon, "warning");
+    assert.equal(displayed[2].titleText, messages[2].textContent);
 });
 
 test("multiple messages wait for the previous toast instead of replacing it", async () => {
@@ -63,7 +66,7 @@ test("multiple messages wait for the previous toast instead of replacing it", as
     });
     const displayed = [];
     const result = runNotifications([
-        { dataset: { toastIcon: "error" }, textContent: "First" },
+        { dataset: { toastIcon: "warning" }, textContent: "First" },
         { dataset: { toastIcon: "success" }, textContent: "Second" }
     ], {
         mixin() {

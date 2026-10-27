@@ -1,5 +1,7 @@
 package com.example.expensetracker.category;
 
+import com.example.expensetracker.budget.BudgetRepository;
+import com.example.expensetracker.transaction.TransactionRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -8,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -25,11 +28,18 @@ public class CategoryService {
     public static final int DEFAULT_PAGE_SIZE = 20;
     public static final int MAX_PAGE_SIZE = 100;
     private static final String SORT_PROPERTY = "id";
+    private static final String ACCESS_DENIED_MESSAGE = "Không thể truy cập danh mục này.";
+    private static final int EXPECTED_WRITE_COUNT = 1;
 
     private final CategoryRepository categoryRepository;
+    private final TransactionRepository transactionRepository;
+    private final BudgetRepository budgetRepository;
 
-    public CategoryService(CategoryRepository categoryRepository) {
+    public CategoryService(CategoryRepository categoryRepository, TransactionRepository transactionRepository,
+            BudgetRepository budgetRepository) {
         this.categoryRepository = categoryRepository;
+        this.transactionRepository = transactionRepository;
+        this.budgetRepository = budgetRepository;
     }
 
     @Transactional
@@ -38,6 +48,51 @@ public class CategoryService {
         CategoryType type = CategoryType.valueOf(dto.getType());
         Category category = new Category(userId, name, type);
         categoryRepository.save(category);
+    }
+
+    public CategoryDTO getCategoryForEdit(@NotNull @Positive Long id, @NotNull @Positive Long userId) {
+        Category category = findOwnedCategory(id, userId);
+        CategoryDTO dto = mapToDTO(category);
+        return dto;
+    }
+
+    @Transactional
+    public void updateCategory(@NotNull @Positive Long id, @Valid @NotNull CategoryDTO dto,
+            @NotNull @Positive Long userId) {
+        findOwnedCategory(id, userId);
+        String name = dto.getName().strip();
+        CategoryType type = CategoryType.valueOf(dto.getType());
+        int updatedRows = categoryRepository.updateByIdAndUserId(id, userId, name, type);
+        requireSuccessfulWrite(updatedRows);
+    }
+
+    @Transactional
+    public void deleteCategory(@NotNull @Positive Long id, @NotNull @Positive Long userId) {
+        // The lock prevents new foreign-key references between the usage checks and deletion.
+        categoryRepository.findByIdAndUserIdForUpdate(id, userId)
+                .orElseThrow(() -> new AccessDeniedException(ACCESS_DENIED_MESSAGE));
+        long transactionCount = transactionRepository.countByCategoryIdAndUserId(id, userId);
+        if (transactionCount > 0) {
+            throw new CategoryInUseException();
+        }
+        if (budgetRepository.existsByCategoryIdAndUserId(id, userId)) {
+            throw new CategoryInUseException();
+        }
+
+        int deletedRows = categoryRepository.deleteByIdAndUserId(id, userId);
+        requireSuccessfulWrite(deletedRows);
+    }
+
+    private Category findOwnedCategory(Long id, Long userId) {
+        Category category = categoryRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new AccessDeniedException(ACCESS_DENIED_MESSAGE));
+        return category;
+    }
+
+    private void requireSuccessfulWrite(int affectedRows) {
+        if (affectedRows != EXPECTED_WRITE_COUNT) {
+            throw new AccessDeniedException(ACCESS_DENIED_MESSAGE);
+        }
     }
 
     public List<CategoryDTO> getAllCategoriesByUserId(@NotNull @Positive Long userId) {

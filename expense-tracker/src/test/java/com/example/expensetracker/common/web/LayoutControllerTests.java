@@ -152,7 +152,22 @@ class LayoutControllerTests {
                 .andReturn();
 
         assertThat(result.getResponse().getContentAsString())
-                .doesNotContain("id=\"toast-success\"", "id=\"toast-error\"");
+                .doesNotContain("id=\"toast-success\"", "id=\"toast-error\"", "id=\"toast-warning\"");
+    }
+
+    @Test
+    void rendersEscapedWarningFlashBeforeSuccessToast() throws Exception {
+        MvcResult result = mockMvc.perform(get("/login")
+                        .flashAttr("warning", "Budget <script>alert(1)</script>")
+                        .flashAttr("success", "Transaction saved"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String html = result.getResponse().getContentAsString();
+        assertThat(html).contains("id=\"toast-warning\"", "data-toast-icon=\"warning\"",
+                "Budget &lt;script&gt;alert(1)&lt;/script&gt;", "id=\"toast-success\"");
+        assertThat(html).doesNotContain("<script>alert(1)</script>");
+        assertThat(html.indexOf("id=\"toast-warning\"")).isLessThan(html.indexOf("id=\"toast-success\""));
     }
 
     @Test

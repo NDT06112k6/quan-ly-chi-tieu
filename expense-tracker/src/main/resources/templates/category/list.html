@@ -16,12 +16,24 @@
                         <tr>
                             <th scope="col">Tên</th>
                             <th scope="col">Loại</th>
+                            <th scope="col">Thao tác</th>
                         </tr>
                         </thead>
                         <tbody>
                         <tr th:each="category : ${categories.content}">
                             <td th:text="${category.name}"></td>
                             <td th:text="${category.type == 'CHI' ? 'Chi tiêu (CHI)' : 'Thu nhập (THU)'}"></td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <a class="btn btn-sm btn-outline-primary"
+                                       th:href="@{/categories/{id}/edit(id=${category.id})}"
+                                       th:attr="aria-label=|Sửa danh mục ${category.name}|">Sửa</a>
+                                    <form method="post" th:action="@{/categories/{id}/delete(id=${category.id})}">
+                                        <button class="btn btn-sm btn-outline-danger" type="submit"
+                                                th:attr="aria-label=|Xóa danh mục ${category.name}|">Xóa</button>
+                                    </form>
+                                </div>
+                            </td>
                         </tr>
                         </tbody>
                     </table>

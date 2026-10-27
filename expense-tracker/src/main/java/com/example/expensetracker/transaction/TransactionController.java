@@ -36,6 +36,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Controller
@@ -115,7 +116,10 @@ public class TransactionController {
             return response;
         }
 
-        transactionService.createTransaction(dto, userId);
+        Optional<String> warning = transactionService.createTransaction(dto, userId);
+        if (warning.isPresent()) {
+            FlashMessageUtil.addWarning(redirectAttributes, warning.get());
+        }
         FlashMessageUtil.addSuccess(redirectAttributes, CREATE_SUCCESS_MESSAGE);
         ModelAndView response = new ModelAndView(LIST_REDIRECT);
         return response;

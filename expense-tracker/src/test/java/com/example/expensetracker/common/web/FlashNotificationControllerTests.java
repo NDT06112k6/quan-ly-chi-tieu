@@ -7,12 +7,14 @@ import com.example.expensetracker.category.CategoryService;
 import com.example.expensetracker.common.util.CategoryViewHelper;
 import com.example.expensetracker.config.SecurityConfig;
 import com.example.expensetracker.transaction.TransactionController;
+import com.example.expensetracker.transaction.TransactionDTO;
 import com.example.expensetracker.transaction.TransactionService;
 import com.example.expensetracker.user.CurrentUserService;
 import com.example.expensetracker.user.UserProfileController;
 import com.example.expensetracker.user.UserProfileDTO;
 import com.example.expensetracker.user.UserService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -27,6 +29,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.ui.Model;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,6 +52,7 @@ class FlashNotificationControllerTests {
     private static final String USERNAME = "notification-test@example.invalid";
     private static final Long USER_ID = 42L;
     private final MockMvc mockMvc;
+    private final TransactionService transactionService;
 
     @MockitoBean
     private UserService userService;
@@ -60,8 +64,9 @@ class FlashNotificationControllerTests {
     private CategoryViewHelper categoryViewHelper;
 
     @Autowired
-    FlashNotificationControllerTests(MockMvc mockMvc) {
+    FlashNotificationControllerTests(MockMvc mockMvc, TransactionService transactionService) {
         this.mockMvc = mockMvc;
+        this.transactionService = transactionService;
     }
 
     @BeforeEach
@@ -87,7 +92,22 @@ class FlashNotificationControllerTests {
         mockMvc.perform(validRequest(path))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl(destination))
-                .andExpect(flash().attribute("success", message));
+                .andExpect(flash().attribute("success", message))
+                .andExpect(flash().attributeCount(1));
+    }
+
+    @Test
+    void successfulTransactionWithBudgetAlertFlashesWarningAndSuccess() throws Exception {
+        String message = "Ngân sách đã vượt 0.10.";
+        when(transactionService.createTransaction(any(TransactionDTO.class), eq(USER_ID)))
+                .thenReturn(Optional.of(message));
+
+        mockMvc.perform(validRequest("/transactions"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/transactions"))
+                .andExpect(flash().attribute("warning", message))
+                .andExpect(flash().attribute("success", "Thêm giao dịch thành công!"))
+                .andExpect(flash().attributeCount(2));
     }
 
     @ParameterizedTest

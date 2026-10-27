@@ -1,13 +1,14 @@
 <th:block xmlns:th="http://www.thymeleaf.org"
-          th:replace="~{layout/main-layout :: layout('Thêm danh mục', 'categories', ~{::content})}">
+          th:replace="~{layout/main-layout :: layout(${categoryDTO.id != null ? 'Sửa danh mục' : 'Thêm danh mục'}, 'categories', ~{::content})}">
     <div th:fragment="content" class="page-content form-page">
         <div class="row justify-content-center">
             <div class="col-12">
                 <section class="card border-0 rounded-4 shadow-sm">
                     <div class="card-body p-4 p-md-5">
-                        <h1 class="h3 mb-3">Thêm danh mục</h1>
+                        <h1 class="h3 mb-3" th:text="${categoryDTO.id != null ? 'Sửa danh mục' : 'Thêm danh mục'}">Thêm danh mục</h1>
                         <p class="page-description mb-4">Đặt tên và chọn loại để phân nhóm các giao dịch của bạn.</p>
-                        <form method="post" th:action="@{/categories}" th:object="${categoryDTO}">
+                        <form method="post" th:object="${categoryDTO}"
+                              th:action="${categoryDTO.id != null} ? @{/categories/{id}/edit(id=${categoryDTO.id})} : @{/categories}">
                             <div class="mb-3">
                                 <label class="form-label" for="name">Tên danh mục</label>
                                 <input class="form-control" type="text" id="name" th:field="*{name}" maxlength="100"
@@ -28,7 +29,11 @@
                                 <p class="invalid-feedback d-block" id="type-error" th:if="${#fields.hasErrors('type')}"
                                    th:errors="*{type}"></p>
                             </div>
-                            <button class="btn btn-primary" type="submit">Lưu danh mục</button>
+                            <p class="text-body-secondary" th:if="${categoryDTO.id != null}">
+                                Đổi loại danh mục sẽ thay đổi cách thống kê các giao dịch đã gắn với danh mục này.
+                            </p>
+                            <button class="btn btn-primary" type="submit"
+                                    th:text="${categoryDTO.id != null ? 'Cập nhật danh mục' : 'Lưu danh mục'}">Lưu danh mục</button>
                         </form>
                         <p class="text-center text-body-secondary mt-4 mb-0"><a th:href="@{/categories}">Quay lại danh
                             sách</a></p>

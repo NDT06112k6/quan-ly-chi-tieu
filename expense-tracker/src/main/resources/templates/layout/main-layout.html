@@ -181,6 +181,9 @@
         <span id="toast-error" data-toast-icon="error"
               th:if="${flashError != null or param.error != null}"
               th:text="${flashError != null ? flashError : (#strings.isEmpty(queryError) ? defaultError : queryError)}"></span>
+        <span id="toast-warning" data-toast-icon="warning"
+              th:if="${warning instanceof T(java.lang.String)}"
+              th:text="${warning}"></span>
         <span id="toast-success" data-toast-icon="success"
               th:if="${success != null or param.success != null or param.logout != null}"
               th:text="${success != null ? success : (param.logout != null ? 'Bạn đã đăng xuất thành công.' : (#strings.isEmpty(querySuccess) ? defaultSuccess : querySuccess))}"></span>
