@@ -1,7 +1,9 @@
 package com.example.expensetracker.transaction;
 
 import com.example.expensetracker.budget.Budget;
+import com.example.expensetracker.budget.BudgetPeriod;
 import com.example.expensetracker.budget.BudgetRepository;
+import com.example.expensetracker.budget.BudgetType;
 import com.example.expensetracker.category.Category;
 import com.example.expensetracker.category.CategoryRepository;
 import com.example.expensetracker.category.CategoryType;
@@ -43,11 +45,13 @@ public class TransactionService {
     private static final String DATE_SORT_PROPERTY = "occurredOn";
     private static final String ID_SORT_PROPERTY = "id";
     private static final int MONEY_SCALE = 2;
+    private static final LocalDate MINIMUM_TRANSACTION_DATE = LocalDate.of(1000, 1, 1);
+    private static final LocalDate MAXIMUM_TRANSACTION_DATE = LocalDate.of(9999, 12, 31);
     private static final int EXPECTED_WRITE_COUNT = 1;
     private static final String TRANSACTION_ACCESS_DENIED = "Không thể truy cập giao dịch này.";
     private static final String UTF8_BOM = "\uFEFF";
     private static final String BUDGET_WARNING_MESSAGE =
-            "Danh mục \"%s\" đã vượt ngân sách tháng %s: tổng chi %s, hạn mức %s, vượt %s.";
+            "Danh mục \"%s\" đã vượt ngân sách %s %s: tổng chi %s, hạn mức %s, vượt %s.";
     private static final List<String> CSV_HEADER = List.of("Ngày", "Danh mục", "Số tiền", "Ghi chú");
 
     private final TransactionRepository transactionRepository;
@@ -76,23 +80,42 @@ public class TransactionService {
     private Optional<String> checkBudgetAlert(Long userId, Long categoryId, LocalDate occurredOn) {
         Category category = findOwnedCategory(categoryId, userId);
         Optional<String> warning = Optional.empty();
+        for (BudgetType type : BudgetType.values()) {
+            BudgetPeriod period = BudgetPeriod.containing(type, occurredOn);
+            Optional<String> periodWarning = checkBudgetAlertForPeriod(userId, category, period);
+            warning = combineWarnings(warning, periodWarning);
+        }
+        return warning;
+    }
+
+    private Optional<String> checkBudgetAlertForPeriod(Long userId, Category category, BudgetPeriod period) {
+        Optional<String> warning = Optional.empty();
         if (category.getType() != CategoryType.CHI) {
             return warning;
         }
-
-        YearMonth month = YearMonth.from(occurredOn);
-        LocalDate startDate = month.atDay(1);
-        LocalDate endDate = month.atEndOfMonth();
-        Optional<Budget> budget = budgetRepository.findByUserIdAndCategoryIdAndMonth(
-                userId, categoryId, startDate);
+        Optional<Budget> budget = budgetRepository.findByUserIdAndCategoryIdAndPeriodAndType(
+                userId, category.getId(), period.period(), period.type());
         if (budget.isEmpty()) {
             return warning;
         }
-
-        BigDecimal totalExpense = transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
-                userId, categoryId, startDate, endDate).setScale(MONEY_SCALE);
+        BigDecimal totalExpense = sumBudgetExpenses(userId, category.getId(), period);
         warning = createBudgetWarning(category, budget.get(), totalExpense);
         return warning;
+    }
+
+    private BigDecimal sumBudgetExpenses(Long userId, Long categoryId, BudgetPeriod period) {
+        LocalDate startDate = period.startDate();
+        LocalDate endDate = period.endDate();
+        // ISO weeks can cross the storage boundary; no transactions can exist outside MySQL's DATE range.
+        if (startDate.isBefore(MINIMUM_TRANSACTION_DATE)) {
+            startDate = MINIMUM_TRANSACTION_DATE;
+        }
+        if (endDate.isAfter(MAXIMUM_TRANSACTION_DATE)) {
+            endDate = MAXIMUM_TRANSACTION_DATE;
+        }
+        BigDecimal total = transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
+                userId, categoryId, startDate, endDate).setScale(MONEY_SCALE);
+        return total;
     }
 
     private Optional<String> createBudgetWarning(Category category, Budget budget, BigDecimal totalExpense) {
@@ -100,8 +123,7 @@ public class TransactionService {
         BigDecimal limitAmount = budget.getLimitAmount().setScale(MONEY_SCALE);
         if (totalExpense.compareTo(limitAmount) > 0) {
             BigDecimal exceededAmount = totalExpense.subtract(limitAmount);
-            YearMonth month = YearMonth.from(budget.getMonth());
-            String message = BUDGET_WARNING_MESSAGE.formatted(category.getName(), month,
+            String message = BUDGET_WARNING_MESSAGE.formatted(category.getName(), budget.getType().getLabel(), budget.getPeriod(),
                     totalExpense.toPlainString(), limitAmount.toPlainString(), exceededAmount.toPlainString());
             warning = Optional.of(message);
             log.warn("Transaction change completed with a budget exceeded warning.");
@@ -135,10 +157,8 @@ public class TransactionService {
                 transactionId, userId, dto.getCategoryId(), dto.getAmount(), dto.getOccurredOn(), dto.getNote());
         requireSuccessfulWrite(updatedRows);
         Optional<String> warning = checkBudgetAlert(userId, dto.getCategoryId(), dto.getOccurredOn());
-        if (!isSameBudgetPeriod(original, dto)) {
-            Optional<String> previousWarning = checkBudgetAlert(userId, original.getCategoryId(), original.getOccurredOn());
-            warning = combineWarnings(warning, previousWarning);
-        }
+        Optional<String> previousWarning = checkPreviousBudgetAlerts(userId, original, dto);
+        warning = combineWarnings(warning, previousWarning);
         return warning;
     }
 
@@ -169,11 +189,19 @@ public class TransactionService {
         }
     }
 
-    private boolean isSameBudgetPeriod(Transaction original, TransactionDTO updated) {
+    private Optional<String> checkPreviousBudgetAlerts(Long userId, Transaction original, TransactionDTO updated) {
+        Optional<String> warning = Optional.empty();
         boolean sameCategory = original.getCategoryId().equals(updated.getCategoryId());
-        boolean sameMonth = YearMonth.from(original.getOccurredOn()).equals(YearMonth.from(updated.getOccurredOn()));
-        boolean samePeriod = sameCategory && sameMonth;
-        return samePeriod;
+        for (BudgetType type : BudgetType.values()) {
+            BudgetPeriod previous = BudgetPeriod.containing(type, original.getOccurredOn());
+            BudgetPeriod current = BudgetPeriod.containing(type, updated.getOccurredOn());
+            if (!sameCategory || !previous.equals(current)) {
+                Category category = findOwnedCategory(original.getCategoryId(), userId);
+                Optional<String> previousWarning = checkBudgetAlertForPeriod(userId, category, previous);
+                warning = combineWarnings(warning, previousWarning);
+            }
+        }
+        return warning;
     }
 
     private Optional<String> combineWarnings(Optional<String> warning, Optional<String> previousWarning) {

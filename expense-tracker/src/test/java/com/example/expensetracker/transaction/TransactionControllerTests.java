@@ -207,7 +207,25 @@ class TransactionControllerTests {
 
         assertThat(result.getResponse().getContentAsString()).contains("Chỉnh sửa giao dịch", "value=\"123.45\"",
                 "action=\"" + EDIT_PATH + "\"", "name=\"_csrf\"", "Quay lại chi tiết");
+        assertAmountInputMarkup(result.getResponse().getContentAsString(), "123.45");
         verify(transactionService).getTransactionForEdit(TRANSACTION_ID, USER_ID);
+    }
+
+    @Test
+    void retainsRawDecimalAmountWhenAnotherEditFieldFailsValidation() throws Exception {
+        when(transactionService.getTransactionForEdit(TRANSACTION_ID, USER_ID)).thenReturn(createTransactionDTO());
+        stubCategoryOptions();
+
+        MvcResult result = mockMvc.perform(validEditRequest("500000.75").with(request -> {
+                    request.setParameter("note", "x".repeat(1001));
+                    return request;
+                }))
+                .andExpect(status().isBadRequest())
+                .andExpect(view().name("transaction/form"))
+                .andReturn();
+
+        assertAmountInputMarkup(result.getResponse().getContentAsString(), "500000.75");
+        assertThat(result.getResponse().getContentAsString()).contains("action=\"" + EDIT_PATH + "\"");
     }
 
     @Test
@@ -340,6 +358,15 @@ class TransactionControllerTests {
         dto.setOccurredOn(OCCURRED_ON);
         dto.setNote("Lunch");
         return dto;
+    }
+
+    private void assertAmountInputMarkup(String html, String rawAmount) {
+        assertThat(html).contains("inputmode=\"numeric\"", "/js/transaction-amount.js", "100.000", "500.000",
+                "1.000.000", "5.000.000", "10.000.000");
+        assertThat(html).containsOnlyOnce("name=\"amount\"");
+        assertThat(html).containsPattern("<input(?=[^>]*type=\"text\")(?=[^>]*id=\"amount\")[^>]*>");
+        assertThat(html).containsPattern("<input(?=[^>]*type=\"hidden\")(?=[^>]*id=\"realAmount\")"
+                + "(?=[^>]*name=\"amount\")(?=[^>]*value=\"" + java.util.regex.Pattern.quote(rawAmount) + "\")[^>]*>");
     }
 
     private MockHttpServletRequestBuilder validEditRequest() {

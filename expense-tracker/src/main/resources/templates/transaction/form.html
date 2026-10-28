@@ -11,14 +11,27 @@
                         <p th:if="${#lists.isEmpty(categories)}">
                             Bạn cần <a th:href="@{/categories/new}">thêm danh mục</a> trước khi tạo giao dịch.
                         </p>
-                        <form method="post"
+                        <form method="post" id="transaction-form"
                               th:action="${editing == true} ? @{/transactions/{id}/edit(id=${transactionId})} : @{/transactions}"
                               th:object="${transactionDTO}">
                             <div class="mb-3">
                                 <label class="form-label" for="amount">Số tiền</label>
-                                <input class="form-control" type="number" id="amount" th:field="*{amount}" min="0.01"
-                                       max="9999999999999.99"
-                                       step="0.01" required th:errorclass="is-invalid" aria-describedby="amount-error">
+                                <input class="form-control" type="text" id="amount" inputmode="numeric"
+                                       autocomplete="off" spellcheck="false" placeholder="Ví dụ: 400.000" required
+                                       th:classappend="${#fields.hasErrors('amount')} ? 'is-invalid'"
+                                       th:attr="aria-invalid=${#fields.hasErrors('amount')}"
+                                       aria-describedby="amount-help amount-error">
+                                <input type="hidden" th:field="*{amount}" id="realAmount">
+                                <p class="form-text" id="amount-help">
+                                    Đơn vị đồng (₫). Dùng dấu phẩy nếu có phần thập phân, ví dụ 1.000,50.
+                                </p>
+                                <div class="d-flex flex-wrap gap-2 mt-2" role="group" aria-label="Gợi ý số tiền">
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" data-amount="100000">100.000</button>
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" data-amount="500000">500.000</button>
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" data-amount="1000000">1.000.000</button>
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" data-amount="5000000">5.000.000</button>
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" data-amount="10000000">10.000.000</button>
+                                </div>
                                 <p class="invalid-feedback d-block" id="amount-error"
                                    th:if="${#fields.hasErrors('amount')}"
                                    th:errors="*{amount}"></p>
@@ -59,7 +72,9 @@
                                 <p class="invalid-feedback d-block" id="note-error" th:if="${#fields.hasErrors('note')}"
                                    th:errors="*{note}"></p>
                             </div>
-                            <button class="btn btn-primary" type="submit" th:disabled="${#lists.isEmpty(categories)}">
+                            <noscript><p class="text-danger mt-3">Bật JavaScript để nhập số tiền và lưu giao dịch.</p></noscript>
+                            <button class="btn btn-primary" type="submit" id="save-transaction" disabled="disabled"
+                                    th:data-no-categories="${#lists.isEmpty(categories)}">
                                 Lưu
                                 giao dịch
                             </button>
@@ -74,5 +89,6 @@
             </div>
         </div>
         <script defer th:src="@{/js/category-options.js}"></script>
+        <script defer th:src="@{/js/transaction-amount.js}"></script>
     </div>
 </th:block>

@@ -87,3 +87,9 @@
   - `refactor: ...` (Viết lại code cho sạch hơn, không đổi tính năng)
   - `chore: ...` (Cập nhật cấu hình, pom.xml, gitignore)
 - Mỗi commit chỉ nên giải quyết MỘT vấn đề. Không commit khi code đang lỗi compile.
+
+## Quy tắc tư duy cho AI (AI Thinking Rules)
+- Đối với những chức năng chưa quen thuộc hoặc phức tạp (ví dụ: tính toán tuần/tháng, cấu hình JWT, tối ưu N+1 query):
+  - TUYỆT ĐỐI KHÔNG tự viết code từ con số 0.
+  - Hãy chủ động tìm kiếm các dự án mã nguồn mở uy tín trên GitHub (ví dụ: spring-projects/spring-boot, baeldung) để tham khảo ý tưởng, cấu trúc và best practices.
+  - So sánh các cách tiếp cận và chọn ra giải pháp tối ưu, an toàn và dễ bảo trì nhất trước khi bắt tay vào viết code.

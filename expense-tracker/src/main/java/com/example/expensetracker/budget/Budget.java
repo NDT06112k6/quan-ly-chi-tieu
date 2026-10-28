@@ -2,13 +2,16 @@ package com.example.expensetracker.budget;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 
 @Entity
 @Table(name = "budgets")
@@ -24,8 +27,13 @@ public class Budget {
     @Column(name = "category_id", nullable = false)
     private Long categoryId;
 
-    @Column(name = "`month`", nullable = false)
-    private LocalDate month;
+    @Column(name = "period", nullable = false, length = 8)
+    private String period;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "type", nullable = false, length = 7)
+    private BudgetType type;
 
     @Column(name = "limit_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal limitAmount;
@@ -33,10 +41,11 @@ public class Budget {
     protected Budget() {
     }
 
-    public Budget(Long userId, Long categoryId, LocalDate month, BigDecimal limitAmount) {
+    public Budget(Long userId, Long categoryId, BudgetPeriod budgetPeriod, BigDecimal limitAmount) {
         this.userId = userId;
         this.categoryId = categoryId;
-        setMonth(month);
+        this.period = budgetPeriod.period();
+        this.type = budgetPeriod.type();
         this.limitAmount = limitAmount;
     }
 
@@ -56,16 +65,12 @@ public class Budget {
         this.categoryId = categoryId;
     }
 
-    public LocalDate getMonth() {
-        return month;
+    public String getPeriod() {
+        return period;
     }
 
-    public void setMonth(LocalDate month) {
-        if (month == null || month.getDayOfMonth() != 1) {
-            throw new IllegalArgumentException("Budget month must be the first day of a month");
-        }
-
-        this.month = month;
+    public BudgetType getType() {
+        return type;
     }
 
     public BigDecimal getLimitAmount() {

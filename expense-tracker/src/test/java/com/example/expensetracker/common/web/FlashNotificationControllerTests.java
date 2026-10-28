@@ -126,12 +126,12 @@ class FlashNotificationControllerTests {
     private MockHttpServletRequestBuilder validRequest(String path) {
         MockHttpServletRequestBuilder request = post(path).with(user(USERNAME)).with(csrf())
                 .param("name", "Food")
-                .param("type", "CHI")
+                .param("type", path.equals("/budgets") ? "MONTHLY" : "CHI")
                 .param("amount", "12.34")
                 .param("occurredOn", "2026-10-25")
                 .param("categoryId", "7")
                 .param("limitAmount", "100.00")
-                .param("month", "2026-10")
+                .param("period", "2026-10")
                 .param("oldPassword", "old-test-password")
                 .param("newPassword", "new-test-password");
         return request;

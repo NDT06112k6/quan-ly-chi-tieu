@@ -6,13 +6,15 @@
                 <section class="card border-0 rounded-4 shadow-sm">
                     <div class="card-body p-4 p-md-5">
                         <h1 class="h3 mb-3">Thiết lập ngân sách</h1>
-                        <p class="text-body-secondary mb-4">Chọn lại cùng danh mục và tháng để cập nhật hạn mức.</p>
+                        <p class="text-body-secondary mb-4">Chọn lại cùng danh mục, loại và kỳ ngân sách để cập nhật hạn mức.</p>
                         <p class="alert alert-info" th:if="${#lists.isEmpty(categories)}">
                             Bạn cần
                             <a class="alert-link" th:href="@{/categories/new}">thêm danh mục</a>
                             trước khi thiết lập ngân sách.
                         </p>
-                        <form method="post" th:action="@{/budgets}" th:object="${budgetDTO}">
+                        <form method="post" id="budget-form" th:action="@{/budgets}" th:object="${budgetDTO}"
+                              th:with="monthlySelected=${budgetDTO.type != null and budgetDTO.type.name() == 'MONTHLY'},
+                                       weeklySelected=${budgetDTO.type != null and budgetDTO.type.name() == 'WEEKLY'}">
                             <div class="mb-3">
                                 <label class="form-label" for="categoryId">Danh mục</label>
                                 <select class="form-select" id="categoryId" th:field="*{categoryId}" required
@@ -32,13 +34,36 @@
                                 </noscript>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label" for="month">Tháng</label>
-                                <input class="form-control" type="month" id="month" th:field="*{month}"
-                                       min="1000-01" max="9999-12" required th:errorclass="is-invalid"
-                                       aria-describedby="month-error">
-                                <p class="invalid-feedback d-block" id="month-error"
-                                   th:if="${#fields.hasErrors('month')}" th:errors="*{month}"></p>
+                                <label class="form-label" for="type">Loại ngân sách</label>
+                                <select class="form-select" id="type" th:field="*{type}" required
+                                        th:errorclass="is-invalid" aria-describedby="type-error">
+                                    <option value="">Chọn loại ngân sách</option>
+                                    <option th:each="budgetType : ${budgetTypes}" th:value="${budgetType}"
+                                            th:text="|Theo ${budgetType.label}|"></option>
+                                </select>
+                                <p class="invalid-feedback d-block" id="type-error"
+                                   th:if="${#fields.hasErrors('type')}" th:errors="*{type}"></p>
                             </div>
+                            <div class="mb-3" id="monthly-period-field" th:hidden="${!monthlySelected}">
+                                <label class="form-label" for="monthlyPeriod">Tháng ngân sách</label>
+                                <input class="form-control" type="month" id="monthlyPeriod" name="period"
+                                       min="1000-01" max="9999-12" th:value="${monthlySelected ? budgetDTO.period : ''}"
+                                       th:required="${monthlySelected}" th:disabled="${!monthlySelected}"
+                                       th:classappend="${#fields.hasErrors('period')} ? 'is-invalid'"
+                                       aria-describedby="period-help period-error">
+                            </div>
+                            <div class="mb-3" id="weekly-period-field" th:hidden="${!weeklySelected}">
+                                <label class="form-label" for="weeklyPeriod">Tuần ngân sách</label>
+                                <input class="form-control" type="week" id="weeklyPeriod" name="period"
+                                       min="1000-W01" max="9999-W52" th:value="${weeklySelected ? budgetDTO.period : ''}"
+                                       th:required="${weeklySelected}" th:disabled="${!weeklySelected}"
+                                       th:classappend="${#fields.hasErrors('period')} ? 'is-invalid'"
+                                       aria-describedby="period-help period-error">
+                            </div>
+                            <p class="form-text" id="period-help">Tuần ngân sách bắt đầu vào Thứ 2 và kết thúc vào Chủ Nhật.</p>
+                            <p class="invalid-feedback d-block" id="period-error"
+                               th:if="${#fields.hasErrors('period')}" th:errors="*{period}"></p>
+                            <noscript><p class="text-body-secondary">Bật JavaScript để chuyển ô chọn tuần và tháng ngay trên form.</p></noscript>
                             <div class="mb-4">
                                 <label class="form-label" for="limitAmount">Hạn mức ngân sách</label>
                                 <input class="form-control" type="number" id="limitAmount" th:field="*{limitAmount}"
@@ -59,5 +84,6 @@
             </div>
         </div>
         <script defer th:src="@{/js/category-options.js}"></script>
+        <script defer th:src="@{/js/budget-period.js}"></script>
     </div>
 </th:block>

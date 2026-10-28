@@ -1,5 +1,8 @@
 package com.example.expensetracker;
 
+import com.example.expensetracker.budget.BudgetPeriod;
+import com.example.expensetracker.budget.BudgetDTO;
+import com.example.expensetracker.budget.BudgetType;
 import com.example.expensetracker.budget.Budget;
 import com.example.expensetracker.budget.BudgetRepository;
 import com.example.expensetracker.category.Category;
@@ -150,9 +153,15 @@ class RepositoryIsolationTests {
         BigDecimal limit = new BigDecimal("9999999999999.99");
         LocalDate month = LocalDate.of(2026, 10, 1);
         Budget ownBudget = budgetRepository.saveAndFlush(new Budget(
-                owner.getId(), ownerCategory.getId(), month, limit));
+                owner.getId(),
+                ownerCategory.getId(),
+                BudgetPeriod.containing(BudgetType.MONTHLY, month),
+                limit));
         Budget otherBudget = budgetRepository.saveAndFlush(new Budget(
-                otherUser.getId(), otherCategory.getId(), month, new BigDecimal("0.10")));
+                otherUser.getId(),
+                otherCategory.getId(),
+                BudgetPeriod.containing(BudgetType.MONTHLY, month),
+                new BigDecimal("0.10")));
         entityManager.clear();
 
         assertThat(budgetRepository.findAllByUserId(owner.getId()))
@@ -165,12 +174,18 @@ class RepositoryIsolationTests {
         Budget reloaded = budgetRepository.findByIdAndUserId(ownBudget.getId(), owner.getId())
                 .orElseThrow();
         assertThat(reloaded.getLimitAmount()).isEqualByComparingTo(limit);
-        assertThat(reloaded.getMonth()).isEqualTo(month);
+        assertThat(reloaded.getPeriod()).isEqualTo("2026-10");
+        assertThat(reloaded.getType()).isEqualTo(BudgetType.MONTHLY);
 
+        BudgetDTO update = new BudgetDTO();
+        update.setCategoryId(ownerCategory.getId());
+        update.setPeriod("2026-10");
+        update.setType(BudgetType.MONTHLY);
+        update.setLimitAmount(new BigDecimal("0.01"));
         assertThat(budgetRepository.updateByIdAndUserId(
-                otherBudget.getId(), owner.getId(), ownerCategory.getId(), month, new BigDecimal("0.01"))).isZero();
+                otherBudget.getId(), owner.getId(), update)).isZero();
         assertThat(budgetRepository.updateByIdAndUserId(
-                ownBudget.getId(), owner.getId(), ownerCategory.getId(), month, new BigDecimal("0.01"))).isEqualTo(1);
+                ownBudget.getId(), owner.getId(), update)).isEqualTo(1);
 
         Budget updated = budgetRepository.findByIdAndUserId(ownBudget.getId(), owner.getId())
                 .orElseThrow();
@@ -195,16 +210,22 @@ class RepositoryIsolationTests {
     @Test
     void rejectsBudgetWithAnotherUsersCategory() {
         Budget budget = new Budget(
-                owner.getId(), otherCategory.getId(), LocalDate.of(2026, 10, 1), new BigDecimal("12.34"));
+                owner.getId(),
+                otherCategory.getId(),
+                BudgetPeriod.containing(BudgetType.MONTHLY, LocalDate.of(2026, 10, 1)),
+                new BigDecimal("12.34"));
 
         assertThatThrownBy(() -> budgetRepository.saveAndFlush(budget))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
-    void rejectsBudgetMonthThatIsNotTheFirstDay() {
+    void rejectsMalformedMonthlyBudgetPeriod() {
         assertThatThrownBy(() -> new Budget(
-                owner.getId(), ownerCategory.getId(), LocalDate.of(2026, 10, 23), new BigDecimal("12.34")))
+                owner.getId(),
+                ownerCategory.getId(),
+                new BudgetPeriod(BudgetType.MONTHLY, "2026-10-23"),
+                new BigDecimal("12.34")))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

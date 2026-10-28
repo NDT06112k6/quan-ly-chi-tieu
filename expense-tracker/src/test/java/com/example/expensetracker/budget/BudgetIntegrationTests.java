@@ -92,7 +92,7 @@ class BudgetIntegrationTests {
                 .andReturn();
         Map<String, Object> attributes = result.getModelAndView().getModel();
         BudgetDTO dto = (BudgetDTO) attributes.get(BudgetDTO.MODEL_ATTRIBUTE);
-        assertThat(dto.getMonth()).isEqualTo(YearMonth.now().toString());
+        assertThat(dto.getPeriod()).isEqualTo(YearMonth.now().toString());
         assertThat((List<?>) attributes.get("categories")).allMatch(CategoryDTO.class::isInstance);
     }
 
@@ -107,11 +107,12 @@ class BudgetIntegrationTests {
         assertThat(budgets).hasSize(1);
         Budget budget = budgets.getFirst();
         assertThat(budget.getLimitAmount()).isEqualByComparingTo(amount);
-        assertThat(budget.getMonth()).isEqualTo(LocalDate.of(2026, 10, 1));
+        assertThat(budget.getPeriod()).isEqualTo("2026-10");
+        assertThat(budget.getType()).isEqualTo(BudgetType.MONTHLY);
         assertThat(budget.getCategoryId()).isEqualTo(ownerCategory.getId());
         assertThat(budget.getId()).isNotEqualTo(999999L);
         assertThat(budgetsFor(otherUser.getId())).isEmpty();
-        assertThat(budgetService.getBudgetsByUserId(owner.getId()).getContent().getFirst().getMonth())
+        assertThat(budgetService.getBudgetsByUserId(owner.getId()).getContent().getFirst().getPeriod())
                 .isEqualTo("2026-10");
     }
 
@@ -125,15 +126,18 @@ class BudgetIntegrationTests {
         assertThat(updated).hasSize(1);
         assertThat(updated.getFirst().getId()).isEqualTo(originalId);
         assertThat(updated.getFirst().getLimitAmount()).isEqualByComparingTo("78.90");
-        mockMvc.perform(validRequest().with(fieldValue("month", "2026-11")))
+        mockMvc.perform(validRequest().with(fieldValue("period", "2026-11")))
                 .andExpect(redirectedUrl("/budgets"));
         assertThat(budgetsFor(owner.getId())).hasSize(2);
     }
 
     @Test
     void displaysBudgetLimitAsGroupedDongWithoutChangingItsValue() throws Exception {
-        Budget budget = new Budget(owner.getId(), ownerCategory.getId(),
-                LocalDate.of(2026, 10, 1), new BigDecimal("1250000.75"));
+        Budget budget = new Budget(
+                owner.getId(),
+                ownerCategory.getId(),
+                BudgetPeriod.containing(BudgetType.MONTHLY, LocalDate.of(2026, 10, 1)),
+                new BigDecimal("1250000.75"));
         entityManager.persist(budget);
         entityManager.flush();
 
@@ -146,8 +150,11 @@ class BudgetIntegrationTests {
 
     @Test
     void rejectsForeignCategoryWithoutChangingForeignBudget() throws Exception {
-        Budget foreignBudget = new Budget(otherUser.getId(), otherCategory.getId(),
-                LocalDate.of(2026, 10, 1), new BigDecimal("10.00"));
+        Budget foreignBudget = new Budget(
+                otherUser.getId(),
+                otherCategory.getId(),
+                BudgetPeriod.containing(BudgetType.MONTHLY, LocalDate.of(2026, 10, 1)),
+                new BigDecimal("10.00"));
         entityManager.persist(foreignBudget);
         mockMvc.perform(validRequest().with(fieldValue("categoryId", otherCategory.getId().toString())))
                 .andExpect(status().isForbidden())
@@ -167,8 +174,8 @@ class BudgetIntegrationTests {
     }
 
     @ParameterizedTest
-    @CsvSource(value = {"month|", "month|2026-13", "month|2026-1", "month|2026-10-01",
-            "month|0000-01", "month|0999-12", "limitAmount|", "limitAmount|0", "limitAmount|-1",
+    @CsvSource(value = {"period|", "period|2026-13", "period|2026-1", "period|2026-10-01",
+            "period|0000-01", "period|0999-12", "limitAmount|", "limitAmount|0", "limitAmount|-1",
             "limitAmount|1.001", "limitAmount|10000000000000", "categoryId|", "categoryId|0"},
             delimiter = '|', emptyValue = "")
     void rejectsInvalidInputAndRepopulatesOwnedDropdown(String field, String value) throws Exception {
@@ -191,8 +198,11 @@ class BudgetIntegrationTests {
     @Test
     void paginatesOnlyOwnedBudgetDtosAndSortsNewestMonthFirst() throws Exception {
         persistMonthlyBudgets(23);
-        entityManager.persist(new Budget(otherUser.getId(), otherCategory.getId(),
-                LocalDate.of(2099, 1, 1), new BigDecimal("999.00")));
+        entityManager.persist(new Budget(
+                otherUser.getId(),
+                otherCategory.getId(),
+                BudgetPeriod.containing(BudgetType.MONTHLY, LocalDate.of(2099, 1, 1)),
+                new BigDecimal("999.00")));
         MvcResult result = mockMvc.perform(get("/budgets").with(user(owner.getEmail()))
                         .param("page", "1").param("size", "20").param("userId", otherUser.getId().toString()))
                 .andExpect(status().isOk())
@@ -205,7 +215,7 @@ class BudgetIntegrationTests {
         assertThat(page.getContent()).hasSize(3).allMatch(BudgetDTO.class::isInstance);
         Page<BudgetDTO> firstPage = budgetService.getBudgetsByUserId(owner.getId());
         assertThat(firstPage.getSize()).isEqualTo(20);
-        assertThat(firstPage.getContent().getFirst().getMonth()).isEqualTo("2027-11");
+        assertThat(firstPage.getContent().getFirst().getPeriod()).isEqualTo("2027-11");
         assertThat(budgetService.getBudgetsByUserId(owner.getId(), PageRequest.of(0, 1000)).getSize())
                 .isEqualTo(BudgetService.MAX_PAGE_SIZE);
     }
@@ -236,9 +246,96 @@ class BudgetIntegrationTests {
     @Test
     void databaseRejectsDuplicateUserCategoryMonth() {
         LocalDate month = LocalDate.of(2026, 10, 1);
-        entityManager.persist(new Budget(owner.getId(), ownerCategory.getId(), month, BigDecimal.ONE));
+        entityManager.persist(new Budget(
+                owner.getId(),
+                ownerCategory.getId(),
+                BudgetPeriod.containing(BudgetType.MONTHLY, month),
+                BigDecimal.ONE));
         assertThatThrownBy(() -> {
-            entityManager.persist(new Budget(owner.getId(), ownerCategory.getId(), month, BigDecimal.TEN));
+            entityManager.persist(new Budget(
+                owner.getId(),
+                ownerCategory.getId(),
+                BudgetPeriod.containing(BudgetType.MONTHLY, month),
+                BigDecimal.TEN));
+            entityManager.flush();
+        }).isInstanceOf(jakarta.persistence.PersistenceException.class);
+    }
+
+    @Test
+    void createsWeeklyAndMonthlyBudgetsTogetherAndUpdatesOnlyTheMatchingPeriodAndType() throws Exception {
+        mockMvc.perform(validRequest()).andExpect(redirectedUrl("/budgets"));
+        mockMvc.perform(validRequest().with(fieldValue("type", "WEEKLY"))
+                        .with(fieldValue("period", "2026-W43")))
+                .andExpect(redirectedUrl("/budgets"));
+        mockMvc.perform(validRequest().with(fieldValue("type", "WEEKLY"))
+                        .with(fieldValue("period", "2026-W43")).with(fieldValue("limitAmount", "50.50")))
+                .andExpect(redirectedUrl("/budgets"));
+
+        List<Budget> budgets = budgetsFor(owner.getId());
+        assertThat(budgets).hasSize(2);
+        assertThat(budgets).filteredOn(budget -> budget.getType() == BudgetType.MONTHLY)
+                .extracting(Budget::getLimitAmount).containsExactly(new BigDecimal("12.34"));
+        assertThat(budgets).filteredOn(budget -> budget.getType() == BudgetType.WEEKLY)
+                .extracting(Budget::getLimitAmount).containsExactly(new BigDecimal("50.50"));
+        mockMvc.perform(get("/budgets").with(user(owner.getEmail())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Tuần 43, 2026")))
+                .andExpect(content().string(containsString("Tháng 10, 2026")));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"WEEKLY,2026-10", "MONTHLY,2026-W43", "WEEKLY,2021-W53", "WEEKLY,2026-W54"})
+    void rejectsPeriodTypeMismatchAndNonexistentIsoWeeks(BudgetType type, String period) throws Exception {
+        mockMvc.perform(validRequest().with(fieldValue("type", type.name())).with(fieldValue("period", period)))
+                .andExpect(status().isOk())
+                .andExpect(view().name("budget/form"))
+                .andExpect(model().attributeHasFieldErrors(BudgetDTO.MODEL_ATTRIBUTE, "period"))
+                .andExpect(content().string(containsString("Owned budget category")));
+
+        assertThat(budgetsFor(owner.getId())).isEmpty();
+    }
+
+    @Test
+    void rejectsForeignCategoryForWeeklyBudget() throws Exception {
+        mockMvc.perform(validRequest().with(fieldValue("type", "WEEKLY"))
+                        .with(fieldValue("period", "2026-W43"))
+                        .with(fieldValue("categoryId", otherCategory.getId().toString())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("INVALID_BUDGET_CATEGORY"));
+
+        assertThat(budgetsFor(owner.getId())).isEmpty();
+        assertThat(budgetsFor(otherUser.getId())).isEmpty();
+    }
+
+    @Test
+    void acceptsValidWeek53SpanningTwoCalendarYears() throws Exception {
+        mockMvc.perform(validRequest().with(fieldValue("type", "WEEKLY"))
+                        .with(fieldValue("period", "2020-W53")))
+                .andExpect(redirectedUrl("/budgets"));
+
+        Budget saved = budgetsFor(owner.getId()).getFirst();
+        assertThat(saved.getPeriod()).isEqualTo("2020-W53");
+        assertThat(saved.getType()).isEqualTo(BudgetType.WEEKLY);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "UNKNOWN"})
+    void rejectsMissingOrUnknownBudgetTypes(String type) throws Exception {
+        mockMvc.perform(validRequest().with(fieldValue("type", type)))
+                .andExpect(status().isOk())
+                .andExpect(view().name("budget/form"))
+                .andExpect(model().attributeHasFieldErrors(BudgetDTO.MODEL_ATTRIBUTE, "type"));
+
+        assertThat(budgetsFor(owner.getId())).isEmpty();
+    }
+
+    @Test
+    void databaseRejectsDuplicateWeeklyBudgetForSameOwnerAndCategory() {
+        BudgetPeriod period = new BudgetPeriod(BudgetType.WEEKLY, "2026-W43");
+        entityManager.persist(new Budget(owner.getId(), ownerCategory.getId(), period, BigDecimal.ONE));
+
+        assertThatThrownBy(() -> {
+            entityManager.persist(new Budget(owner.getId(), ownerCategory.getId(), period, BigDecimal.TEN));
             entityManager.flush();
         }).isInstanceOf(jakarta.persistence.PersistenceException.class);
     }
@@ -254,7 +351,8 @@ class BudgetIntegrationTests {
     private MockHttpServletRequestBuilder validRequest() {
         MockHttpServletRequestBuilder request = post("/budgets").with(user(owner.getEmail())).with(csrf());
         request.param("categoryId", ownerCategory.getId().toString());
-        request.param("month", "2026-10");
+        request.param("period", "2026-10");
+        request.param("type", "MONTHLY");
         request.param("limitAmount", "12.34");
         return request;
     }
@@ -272,7 +370,11 @@ class BudgetIntegrationTests {
         YearMonth startingMonth = YearMonth.of(2026, 1);
         for (int index = 0; index < count; index++) {
             LocalDate month = startingMonth.plusMonths(index).atDay(1);
-            entityManager.persist(new Budget(owner.getId(), ownerCategory.getId(), month, BigDecimal.TEN));
+            entityManager.persist(new Budget(
+                owner.getId(),
+                ownerCategory.getId(),
+                BudgetPeriod.containing(BudgetType.MONTHLY, month),
+                BigDecimal.TEN));
         }
         entityManager.flush();
     }

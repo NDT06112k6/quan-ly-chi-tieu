@@ -4,7 +4,7 @@
         <section class="card border-0 rounded-4 shadow-sm">
             <div class="card-body p-4 p-md-5">
                 <h1 class="h3 mb-3">Ngân sách của tôi</h1>
-                <p class="page-description mb-4">Chủ động phân bổ chi tiêu theo danh mục và từng tháng.</p>
+                <p class="page-description mb-4">Chủ động phân bổ chi tiêu theo danh mục, tuần và tháng.</p>
                 <nav class="d-flex flex-wrap justify-content-between gap-3 mb-4" aria-label="Điều hướng ngân sách">
                     <a class="btn btn-primary" th:href="@{/budgets/new}">Thiết lập ngân sách</a>
                 </nav>
@@ -13,14 +13,16 @@
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                         <tr>
-                            <th scope="col">Tháng</th>
+                            <th scope="col">Loại</th>
+                            <th scope="col">Kỳ ngân sách</th>
                             <th scope="col">Danh mục</th>
                             <th class="text-end" scope="col">Hạn mức</th>
                         </tr>
                         </thead>
                         <tbody>
                         <tr th:each="budget : ${budgets.content}">
-                            <td class="text-nowrap" th:text="${budget.month}"></td>
+                            <td class="text-nowrap" th:text="${budget.type.displayName}"></td>
+                            <td class="text-nowrap" th:text="${budget.periodLabel}"></td>
                             <td class="text-break" th:text="${categoryNames[budget.categoryId]}"></td>
                             <td class="text-end text-nowrap font-monospace fw-semibold"
                                 th:text="${vnCurrency.format(budget.limitAmount)}"></td>

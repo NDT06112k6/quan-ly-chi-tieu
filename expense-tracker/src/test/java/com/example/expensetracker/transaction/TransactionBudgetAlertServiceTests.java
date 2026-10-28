@@ -1,5 +1,7 @@
 package com.example.expensetracker.transaction;
 
+import com.example.expensetracker.budget.BudgetPeriod;
+import com.example.expensetracker.budget.BudgetType;
 import com.example.expensetracker.budget.Budget;
 import com.example.expensetracker.budget.BudgetRepository;
 import com.example.expensetracker.category.Category;
@@ -70,7 +72,7 @@ class TransactionBudgetAlertServiceTests {
         InOrder writesAndChecks = inOrder(categoryRepository, transactionRepository, budgetRepository);
         writesAndChecks.verify(categoryRepository).findByIdAndUserIdForUpdate(CATEGORY_ID, USER_ID);
         writesAndChecks.verify(transactionRepository).saveAndFlush(any(Transaction.class));
-        writesAndChecks.verify(budgetRepository).findByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, month.atDay(1));
+        writesAndChecks.verify(budgetRepository).findByUserIdAndCategoryIdAndPeriodAndType(USER_ID, CATEGORY_ID, month.toString(), BudgetType.MONTHLY);
         writesAndChecks.verify(transactionRepository).sumExpensesByUserIdAndCategoryIdAndDateRange(
                 USER_ID, CATEGORY_ID, month.atDay(1), month.atEndOfMonth());
     }
@@ -98,7 +100,7 @@ class TransactionBudgetAlertServiceTests {
         Optional<String> warning = transactionService.createTransaction(transactionDto(), USER_ID);
 
         assertThat(warning).isEmpty();
-        verify(budgetRepository).findByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, TRANSACTION_MONTH.atDay(1));
+        verify(budgetRepository).findByUserIdAndCategoryIdAndPeriodAndType(USER_ID, CATEGORY_ID, TRANSACTION_MONTH.toString(), BudgetType.MONTHLY);
         verify(transactionRepository).saveAndFlush(any(Transaction.class));
         verifyNoMoreInteractions(transactionRepository);
     }
@@ -141,7 +143,7 @@ class TransactionBudgetAlertServiceTests {
         YearMonth month = TRANSACTION_MONTH;
         configureCategory(CategoryType.CHI);
         DataAccessResourceFailureException failure = new DataAccessResourceFailureException("Budget lookup failed");
-        when(budgetRepository.findByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, month.atDay(1)))
+        when(budgetRepository.findByUserIdAndCategoryIdAndPeriodAndType(USER_ID, CATEGORY_ID, month.toString(), BudgetType.MONTHLY))
                 .thenThrow(failure);
 
         assertThatThrownBy(() -> transactionService.createTransaction(transactionDto(), USER_ID)).isSameAs(failure);
@@ -175,7 +177,7 @@ class TransactionBudgetAlertServiceTests {
         Optional<String> warning = transactionService.createTransaction(dto, USER_ID);
 
         assertThat(warning).isPresent();
-        verify(budgetRepository).findByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, transactionMonth.atDay(1));
+        verify(budgetRepository).findByUserIdAndCategoryIdAndPeriodAndType(USER_ID, CATEGORY_ID, transactionMonth.toString(), BudgetType.MONTHLY);
         assertThat(warning.orElseThrow()).contains(transactionMonth.toString());
     }
 
@@ -221,6 +223,8 @@ class TransactionBudgetAlertServiceTests {
         configureCategory(CategoryType.CHI);
         configureBudget(TRANSACTION_MONTH);
         configureBudget(updatedMonth);
+        configureMissingWeeklyBudget(CATEGORY_ID, TRANSACTION_MONTH);
+        configureMissingWeeklyBudget(CATEGORY_ID, updatedMonth);
         configureSuccessfulUpdate(CATEGORY_ID);
         when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
                 USER_ID, CATEGORY_ID, TRANSACTION_MONTH.atDay(1), TRANSACTION_MONTH.atEndOfMonth()))
@@ -243,6 +247,8 @@ class TransactionBudgetAlertServiceTests {
         configureCategory(CategoryType.CHI);
         configureBudget(TRANSACTION_MONTH);
         configureOtherCategoryBudget(updatedCategoryId);
+        configureMissingWeeklyBudget(CATEGORY_ID, TRANSACTION_MONTH);
+        configureMissingWeeklyBudget(updatedCategoryId, TRANSACTION_MONTH);
         configureSuccessfulUpdate(updatedCategoryId);
         when(transactionRepository.sumExpensesByUserIdAndCategoryIdAndDateRange(
                 USER_ID, CATEGORY_ID, TRANSACTION_MONTH.atDay(1), TRANSACTION_MONTH.atEndOfMonth()))
@@ -313,10 +319,15 @@ class TransactionBudgetAlertServiceTests {
 
     private void configureOtherCategoryBudget(Long categoryId) {
         Category category = new Category(USER_ID, "Other expense", CategoryType.CHI);
+        ReflectionTestUtils.setField(category, "id", categoryId);
         when(categoryRepository.findByIdAndUserIdForUpdate(categoryId, USER_ID)).thenReturn(Optional.of(category));
         when(categoryRepository.findByIdAndUserId(categoryId, USER_ID)).thenReturn(Optional.of(category));
-        Budget budget = new Budget(USER_ID, categoryId, TRANSACTION_MONTH.atDay(1), LIMIT);
-        when(budgetRepository.findByUserIdAndCategoryIdAndMonth(USER_ID, categoryId, TRANSACTION_MONTH.atDay(1)))
+        Budget budget = new Budget(
+                USER_ID,
+                categoryId,
+                BudgetPeriod.containing(BudgetType.MONTHLY, TRANSACTION_MONTH.atDay(1)),
+                LIMIT);
+        when(budgetRepository.findByUserIdAndCategoryIdAndPeriodAndType(USER_ID, categoryId, TRANSACTION_MONTH.toString(), BudgetType.MONTHLY))
                 .thenReturn(Optional.of(budget));
     }
 
@@ -332,9 +343,19 @@ class TransactionBudgetAlertServiceTests {
     }
 
     private void configureBudget(YearMonth month) {
-        Budget budget = new Budget(USER_ID, CATEGORY_ID, month.atDay(1), LIMIT);
-        when(budgetRepository.findByUserIdAndCategoryIdAndMonth(USER_ID, CATEGORY_ID, month.atDay(1)))
+        Budget budget = new Budget(
+                USER_ID,
+                CATEGORY_ID,
+                BudgetPeriod.containing(BudgetType.MONTHLY, month.atDay(1)),
+                LIMIT);
+        when(budgetRepository.findByUserIdAndCategoryIdAndPeriodAndType(USER_ID, CATEGORY_ID, month.toString(), BudgetType.MONTHLY))
                 .thenReturn(Optional.of(budget));
+    }
+
+    private void configureMissingWeeklyBudget(Long categoryId, YearMonth month) {
+        BudgetPeriod period = BudgetPeriod.containing(BudgetType.WEEKLY, month.atDay(1));
+        when(budgetRepository.findByUserIdAndCategoryIdAndPeriodAndType(
+                USER_ID, categoryId, period.period(), BudgetType.WEEKLY)).thenReturn(Optional.empty());
     }
 
     private TransactionDTO transactionDto() {

@@ -97,6 +97,10 @@ class TransactionIntegrationTests {
                         "<option value=\"" + ownerCategory.getId() + "\">My category</option>")))
                 .andExpect(content().string(not(containsString("Foreign private category"))))
                 .andExpect(content().string(containsString("name=\"_csrf\"")))
+                .andExpect(content().string(containsString("inputmode=\"numeric\"")))
+                .andExpect(content().string(containsString("id=\"realAmount\"")))
+                .andExpect(content().string(containsString("/js/transaction-amount.js")))
+                .andExpect(content().string(containsString("data-amount=\"10000000\"")))
                 .andReturn();
 
         assertThat(result.getModelAndView()).isNotNull();

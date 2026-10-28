@@ -1,5 +1,7 @@
 package com.example.expensetracker.category;
 
+import com.example.expensetracker.budget.BudgetPeriod;
+import com.example.expensetracker.budget.BudgetType;
 import com.example.expensetracker.budget.Budget;
 import com.example.expensetracker.transaction.Transaction;
 import com.example.expensetracker.user.User;
@@ -125,7 +127,11 @@ class CategoryMutationIntegrationTests {
 
     @Test
     void keepsCategoryAndBudgetWhenDeletionIsRejected() throws Exception {
-        Budget budget = new Budget(owner.getId(), ownedCategory.getId(), TRANSACTION_DATE, AMOUNT);
+        Budget budget = new Budget(
+                owner.getId(),
+                ownedCategory.getId(),
+                BudgetPeriod.containing(BudgetType.MONTHLY, TRANSACTION_DATE),
+                AMOUNT);
         entityManager.persist(budget);
         entityManager.flush();
 

@@ -51,7 +51,13 @@ public class BudgetController {
 
     @InitBinder(BudgetDTO.MODEL_ATTRIBUTE)
     public void configureBudgetBinding(WebDataBinder binder) {
-        binder.setAllowedFields("categoryId", "month", "limitAmount");
+        binder.setAllowedFields("categoryId", "period", "type", "limitAmount");
+    }
+
+    @ModelAttribute("budgetTypes")
+    public BudgetType[] getBudgetTypes() {
+        BudgetType[] types = BudgetType.values();
+        return types;
     }
 
     @GetMapping
@@ -71,7 +77,8 @@ public class BudgetController {
     public String showBudgetForm(Model model) {
         Long userId = currentUserService.getUserId();
         BudgetDTO dto = new BudgetDTO();
-        dto.setMonth(YearMonth.now().toString());
+        dto.setType(BudgetType.MONTHLY);
+        dto.setPeriod(YearMonth.now().toString());
         model.addAttribute(BudgetDTO.MODEL_ATTRIBUTE, dto);
         categoryViewHelper.populateCategoryOptions(model, userId, null);
         return FORM_VIEW;

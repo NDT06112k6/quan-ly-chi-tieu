@@ -1,6 +1,5 @@
 package com.example.expensetracker.budget;
 
-import com.example.expensetracker.common.util.MonthUtil;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,7 +9,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,13 +21,8 @@ public interface BudgetRepository extends JpaRepository<Budget, Long> {
 
     Page<Budget> findByUserId(Long userId, Pageable pageable);
 
-    Optional<Budget> findByUserIdAndCategoryIdAndMonth(Long userId, Long categoryId, LocalDate month);
-
-    default Optional<Budget> findByUserIdAndCategoryIdAndMonth(Long userId, Long categoryId, String month) {
-        LocalDate monthStart = MonthUtil.firstDayOfMonth(month);
-        Optional<Budget> budget = findByUserIdAndCategoryIdAndMonth(userId, categoryId, monthStart);
-        return budget;
-    }
+    Optional<Budget> findByUserIdAndCategoryIdAndPeriodAndType(
+            Long userId, Long categoryId, String period, BudgetType type);
 
     List<Budget> findAllByUserId(Long userId);
 
@@ -63,16 +56,15 @@ public interface BudgetRepository extends JpaRepository<Budget, Long> {
     @Transactional
     @Query("""
             UPDATE Budget entity
-            SET entity.categoryId = :categoryId,
-                entity.month = :month,
-                entity.limitAmount = :limitAmount
+            SET entity.categoryId = :#{#budget.categoryId},
+                entity.period = :#{#budget.period},
+                entity.type = :#{#budget.type},
+                entity.limitAmount = :#{#budget.limitAmount}
             WHERE entity.id = :id
                 AND entity.userId = :userId
             """)
     int updateByIdAndUserId(
             @Param("id") Long id,
             @Param("userId") Long userId,
-            @Param("categoryId") Long categoryId,
-            @Param("month") LocalDate month,
-            @Param("limitAmount") BigDecimal limitAmount);
+            @Param("budget") BudgetDTO budget);
 }

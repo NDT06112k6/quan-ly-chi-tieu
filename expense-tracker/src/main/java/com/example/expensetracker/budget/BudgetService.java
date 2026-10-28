@@ -2,7 +2,6 @@ package com.example.expensetracker.budget;
 
 import com.example.expensetracker.category.Category;
 import com.example.expensetracker.category.CategoryRepository;
-import com.example.expensetracker.common.util.MonthUtil;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -14,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
-import java.time.LocalDate;
 import java.util.Optional;
 
 @Service
@@ -24,7 +22,7 @@ public class BudgetService {
 
     public static final int DEFAULT_PAGE_SIZE = 20;
     public static final int MAX_PAGE_SIZE = 100;
-    private static final String MONTH_SORT_PROPERTY = "month";
+    private static final String PERIOD_SORT_PROPERTY = "period";
     private static final String ID_SORT_PROPERTY = "id";
     private static final int EXPECTED_UPDATE_COUNT = 1;
 
@@ -38,18 +36,18 @@ public class BudgetService {
 
     @Transactional
     public void setBudget(@Valid @NotNull BudgetDTO dto, @NotNull @Positive Long userId) {
-        // Serialize budget writes for the same owned category, including creation of a new month.
+        // Serialize creation and updates for the same category across both budget types.
         Category category = categoryRepository.findByIdAndUserIdForUpdate(dto.getCategoryId(), userId)
                 .orElseThrow(InvalidBudgetCategoryException::new);
-        Optional<Budget> existingBudget = budgetRepository.findByUserIdAndCategoryIdAndMonth(
-                userId, category.getId(), dto.getMonth());
+        BudgetPeriod period = new BudgetPeriod(dto.getType(), dto.getPeriod());
+        Optional<Budget> existingBudget = budgetRepository.findByUserIdAndCategoryIdAndPeriodAndType(
+                userId, category.getId(), period.period(), period.type());
         if (existingBudget.isPresent()) {
             updateExistingBudget(existingBudget.get(), dto, userId);
             return;
         }
 
-        LocalDate month = MonthUtil.firstDayOfMonth(dto.getMonth());
-        Budget budget = new Budget(userId, category.getId(), month, dto.getLimitAmount());
+        Budget budget = new Budget(userId, category.getId(), period, dto.getLimitAmount());
         budgetRepository.saveAndFlush(budget);
     }
 
@@ -61,7 +59,7 @@ public class BudgetService {
 
     public Page<BudgetDTO> getBudgetsByUserId(@NotNull @Positive Long userId, Pageable pageable) {
         int pageSize = Math.min(pageable.getPageSize(), MAX_PAGE_SIZE);
-        Sort sort = Sort.by(Sort.Direction.DESC, MONTH_SORT_PROPERTY, ID_SORT_PROPERTY);
+        Sort sort = Sort.by(Sort.Direction.DESC, PERIOD_SORT_PROPERTY, ID_SORT_PROPERTY);
         Pageable boundedPageable = PageRequest.of(pageable.getPageNumber(), pageSize, sort);
         Page<Budget> budgets = budgetRepository.findByUserId(userId, boundedPageable);
         Page<BudgetDTO> budgetDTOs = budgets.map(this::mapToDTO);
@@ -80,7 +78,8 @@ public class BudgetService {
         BudgetDTO dto = new BudgetDTO();
         dto.setId(budget.getId());
         dto.setCategoryId(budget.getCategoryId());
-        dto.setMonth(MonthUtil.formatMonth(budget.getMonth()));
+        dto.setPeriod(budget.getPeriod());
+        dto.setType(budget.getType());
         dto.setLimitAmount(budget.getLimitAmount());
         return dto;
     }

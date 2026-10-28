@@ -1,5 +1,7 @@
 package com.example.expensetracker.transaction;
 
+import com.example.expensetracker.budget.BudgetPeriod;
+import com.example.expensetracker.budget.BudgetType;
 import com.example.expensetracker.budget.Budget;
 import com.example.expensetracker.category.Category;
 import com.example.expensetracker.category.CategoryType;
@@ -346,7 +348,11 @@ class BudgetAlertIntegrationTests {
     }
 
     private void persistBudget(Category category, YearMonth budgetMonth, String limit) {
-        Budget budget = new Budget(category.getUserId(), category.getId(), budgetMonth.atDay(1), new BigDecimal(limit));
+        Budget budget = new Budget(
+                category.getUserId(),
+                category.getId(),
+                BudgetPeriod.containing(BudgetType.MONTHLY, budgetMonth.atDay(1)),
+                new BigDecimal(limit));
         entityManager.persist(budget);
     }
 

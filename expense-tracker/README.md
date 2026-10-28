@@ -4,8 +4,8 @@
 
 Entities and repositories are grouped into the `user`, `category`, `transaction`
 and `budget` packages. Monetary values use `BigDecimal` and map to
-`DECIMAL(15,2)`. Budget months use `LocalDate` and must be the first calendar day
-of the month. Creation timestamps are initialized before the first insert.
+`DECIMAL(15,2)`. Budgets store a canonical `period` string and a `BudgetType`
+(`MONTHLY` or `WEEKLY`). Creation timestamps are initialized before the first insert.
 
 Category, transaction and budget repositories provide `findAllByUserId`,
 `findByIdAndUserId`, `existsByIdAndUserId`, `updateByIdAndUserId` and `deleteByIdAndUserId`.
@@ -178,7 +178,26 @@ rows per page, ordered by date descending and then ID descending. The service
 also accepts a page size from 1 to 100. Invalid pagination returns HTTP 400.
 The table columns are date, category, amount and note; previous/next buttons
 follow the Spring Data `Page` state. The creation form posts to `/transactions`
-with number/date inputs, a category dropdown and a note field.
+with a formatted amount input, a date input, a category dropdown and a note field.
+
+Both creation and editing use a text amount field with `inputmode="numeric"`
+and `/js/transaction-amount.js`. Typing `400000` displays `400.000`. The visible
+field has no request name; only the hidden `realAmount` input binds to `amount`.
+The script synchronizes that hidden value on input and immediately before
+submission, removing thousands dots. Quick buttons select `100.000`, `500.000`,
+`1.000.000`, `5.000.000` and `10.000.000`, updating both fields without submitting.
+An optional comma marks fractional dong: `1.000,50` submits `1000.50`. Existing
+decimal amounts are restored using that convention when editing or returning
+from validation errors, without rounding or conversion through JavaScript
+`Number`. Caret position is retained while formatting edits within the number.
+
+Blank, zero, negative, nonnumeric or excessive-precision input clears the
+hidden amount and blocks submission with a validation message, so stale hidden
+values cannot be submitted. Backend `BigDecimal` validation remains authoritative.
+The save button is enabled after script initialization when categories exist;
+without JavaScript the form explains that it must be enabled to save. Refresh
+open transaction forms to load the script. No dependencies, migrations,
+environment variables or server cache changes are required.
 
 The owner ID comes from `CurrentUserService`, never from form fields. Before
 inserting, the service resolves the category with `findByIdAndUserId` and
@@ -250,64 +269,81 @@ refresh the transaction list to see the export link.
 
 ## Budgets
 
-Authenticated users can open `GET /budgets`, create or update a budget through
-`GET /budgets/new` and `POST /budgets`, and navigate there from the dashboard.
-Choose the same category and month to update its existing limit; a different
-month creates a new budget. Submitted IDs and ownership fields are ignored.
-The category must belong to the authenticated user; missing or foreign categories
-return HTTP 403 through centralized error handling with `code`, `message` and
-`timestamp`. Failed updates return HTTP 409 rather than reporting success.
+Authenticated users open `GET /budgets` and create/update a limit through
+`GET /budgets/new` and `POST /budgets`. Requests bind `categoryId`, `period`,
+`type` and `limitAmount`. The form selects monthly or weekly budgets and explains
+the corresponding period format. Reusing the same category, period and type
+updates its existing limit; monthly and weekly budgets can coexist for a category.
+Submitted ownership and IDs are ignored. All queries include the authenticated
+user ID; foreign or missing categories return HTTP 403, and failed updates return
+HTTP 409 rather than success.
 
-`BudgetDTO.month` and the repository's String overload accept `yyyy-MM` from
-1000-01 through 9999-12. They map to the first day of that month in the existing
-MySQL DATE column. Limits use positive `BigDecimal` values with at most 13 integer
-digits and 2 decimal digits. Invalid forms retain owned category options and
-display `th:errors`. CSRF protection applies to submission.
+`BudgetDTO.period` is `yyyy-MM` for `MONTHLY` (for example `2026-10`) or
+`yyyy-Www` for `WEEKLY` (for example `2026-W43`). Years are 1000–9999.
+`BudgetPeriod` validates the type/period pair, including whether ISO week 53
+actually exists, before persistence. `@ValidBudgetPeriod` attaches input errors
+to the period field. Limits remain positive `BigDecimal` values with at most
+13 integer and 2 fractional digits. Invalid forms retain values and owned
+category options. CSRF protection applies to submission.
 
-The list and `getBudgetsByUserId` return DTO pages, defaulting to 20 rows and
-capping size at 100, ordered by month descending then ID descending. All reads
-and updates include the owner ID. The category dropdown initially loads 100
-options and can load more through `GET /budgets/categories?page=1`. Transactions
-and budgets share the scoped category view helper and `/js/category-options.js`.
-Refresh open forms to load the updated script path; no server cache reset is needed.
+The type dropdown switches between native `input type="month"` and
+`input type="week"` controls using `/js/budget-period.js`. Only the active
+control is visible, enabled and required, so exactly one canonical `period`
+is submitted. Switching back preserves each control's previous selection.
+The server also renders the correct active picker after validation errors.
+The budget form contains no quick price suggestion buttons. Listings show
+type labels `Tháng`/`Tuần` and periods such as `Tháng 10, 2026` or
+`Tuần 43, 2026`; the DTO's `periodLabel` is presentation only and the stored
+period stays `2026-10`/`2026-W43`. Refresh open budget pages to load this UI.
+There are no schema, dependency, environment variable or server cache changes.
 
-Flyway migration `V2__unique_budget_per_category_month.sql` adds a unique key on
-`(user_id, category_id, month)`. Existing duplicate keys cause migration to fail
-without deleting or merging data; resolve those records explicitly before retrying.
-Budget writes lock the owned category within their transaction to serialize
-concurrent creation and updates. The database unique key also enforces the rule.
-No Maven dependencies or environment variables are added; Hibernate stays in
-`validate` mode.
+Weeks follow Java's [WeekFields.ISO](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/time/temporal/WeekFields.html)
+and the [OpenJDK implementation](https://github.com/openjdk/jdk/blob/master/src/java.base/share/classes/java/time/temporal/WeekFields.java):
+Monday through Sunday, with at least four days in the first week of the ISO
+week-based year. This is deliberately independent of locale. The week-based
+year can differ from the calendar year: `2021-01-01` belongs to `2020-W53`,
+covering `2020-12-28` through `2021-01-03`. Weekly ranges spanning months are
+not restricted to either calendar month.
 
-Creating, editing and deleting transactions check budgets after the successful
-write. `checkBudgetAlert(userId, categoryId, occurredOn)` derives the reporting
-month and year from `occurredOn`, with no dependency on the server's date or
-timezone. Only `CHI` transactions in that category, owned by the authenticated
-user and dated within that month contribute to the total. The date range
-includes both the first and last day, including December 9999. Budget and
-category lookups also include the authenticated owner ID.
+Flyway already has `V2__unique_budget_per_category_month.sql`, so the extension
+uses `V3__update_budget_for_weekly.sql` rather than creating a duplicate V2.
+The existing `month` is a DATE, not a VARCHAR. V3 converts it to a VARCHAR
+`period`, preserves its `yyyy-MM` value and limit, assigns existing rows
+`type=MONTHLY`, and replaces the old first-day check/unique index with a type
+check and unique key on `(user_id, category_id, period, type)`. V1 and V2 remain
+unchanged. Restart the application with the new code so Flyway applies V3;
+old code using the removed `month` column is incompatible with the new schema.
 
-Creation checks the new transaction's period. An edit checks the updated period
-and, when its category or calendar month changes, the original period as well.
-Each distinct category/month is checked once, so changing only the day within
-the same month does not duplicate warnings. Deletion reads and retains the
-original category and date before deleting, then checks the remaining expenses.
-If the remaining total is still over budget it warns; if it is at or below the
-limit there is no warning. Transaction rows are locked before editing/deleting,
-and affected categories are locked in ascending ID order to serialize budget
-checks with concurrent changes.
+`BudgetRepository.findByUserIdAndCategoryIdAndPeriodAndType` looks up one exact
+budget. Budget writes lock the owned category to serialize creation and updates
+with transaction changes. Listings remain paginated DTOs (20 rows by default,
+maximum 100), sorted by canonical period descending then ID descending. The
+category dropdown supports loading more options via `GET /budgets/categories`.
 
-All three mutation service methods return an `Optional<String>` warning. Income
-categories, categories without a budget for the transaction's month, and totals
-at or below the limit return an empty optional. Totals strictly above the limit
-return the category, month, total, limit and exceeded amount using `BigDecimal`
-with two decimal places. When both affected periods remain over budget, their
-messages are combined. Controllers pass warnings and success flashes to the
-existing SweetAlert2 layout after redirecting. Warnings do not throw exceptions
-or roll back successful changes; actual database/query failures propagate and
-roll back without a success flash. No dependencies, migrations, environment
-variables or server cache changes are required. Refresh open pages to use the
-updated behavior; previously saved transactions participate in the new checks.
+Creating, editing and deleting transactions check both monthly and weekly
+budgets after the successful write. `checkBudgetAlert(userId, categoryId, occurredOn)`
+uses the transaction's date, not the server date. Only owned `CHI` transactions
+in the same category and inclusive period range contribute to each total.
+Queries still use explicit `LocalDate startDate/endDate` bounds, without
+`MONTH()` or `YEAR()` on the transaction column. At MySQL's storage boundaries,
+the query is clipped to 1000-01-01/9999-12-31 when the ISO week extends outside
+the representable transaction dates; the ISO period itself remains unchanged.
+
+An edit checks the new periods and any different old category/type/period
+combinations. Moving between weeks of the same month checks both weeks and the
+month once; moving between months in the same ISO week checks both months and
+the week once. Deletion retains the old category/date before removing the row
+and checks the remaining expenses. Category locks use ascending ID order.
+
+All three mutation service methods return an `Optional<String>` warning.
+Income categories, missing budgets and totals at or below their limits do not
+warn. Each exceeded limit contributes a message with the category, type,
+period, exact total, limit and excess using `BigDecimal`. Multiple messages are
+combined and passed to the existing warning toast along with the success flash.
+Warnings preserve successful writes; actual database failures propagate and
+roll back without a success flash. No new Maven dependencies, environment
+variables or server cache changes are required. Refresh open budget forms to
+load the new period/type controls.
 
 ## Dashboard
 
@@ -477,6 +513,10 @@ Use a separate test database by setting `SPRING_DATASOURCE_URL`,
 The transaction dropdown's JavaScript tests use Node's built-in test runner,
 without npm dependencies. With Node 24, run
 `node --test --test-isolation=none src/test/js/transaction-form.test.cjs`.
+Run the formatted amount input tests with
+`node --test --test-isolation=none src/test/js/transaction-amount.test.cjs`.
+Run the budget month/week picker tests with
+`node --test --test-isolation=none src/test/js/budget-period.test.cjs`.
 Run the chart tests with
 `node --test --test-isolation=none src/test/js/dashboard-chart.test.cjs`.
 Run notification tests with
